@@ -33,6 +33,6 @@ jobs:
         run: |
           git config user.name "rain-bot"
           git config user.email "rain-bot@users.noreply.github.com"
-          git add web/model.json
+          git add public/model.json
           git diff --cached --quiet || git commit -m "model: retrain promoted [skip ci]"
           git push

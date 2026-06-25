@@ -11,7 +11,7 @@ import csv, json, math
 from datetime import datetime, timezone
 from sklearn.linear_model import LogisticRegression
 
-MODEL_PATH = "web/model.json"
+MODEL_PATH = "public/model.json"  # Astro serves this at /model.json (was web/model.json pre-Astro)
 LOG_PATH = "data/log.csv"
 MIN_ROWS = 200  # ~8-9 days of labelled data before a model is trustworthy
 RAIN_MM = 0.1   # the raw-forecast baseline's rain threshold

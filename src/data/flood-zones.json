@@ -1,0 +1,12 @@
+[
+  {"name": "Hindmata", "lat": 19.0176, "lon": 72.8430, "severity": 3},
+  {"name": "Sion", "lat": 19.0410, "lon": 72.8620, "severity": 3},
+  {"name": "Kurla", "lat": 19.0726, "lon": 72.8845, "severity": 3},
+  {"name": "Andheri Subway", "lat": 19.1197, "lon": 72.8468, "severity": 3},
+  {"name": "Milan Subway", "lat": 19.0860, "lon": 72.8400, "severity": 3},
+  {"name": "Gandhi Market", "lat": 19.0270, "lon": 72.8570, "severity": 3},
+  {"name": "Malad Subway", "lat": 19.1860, "lon": 72.8480, "severity": 3},
+  {"name": "Chembur", "lat": 19.0626, "lon": 72.8990, "severity": 2},
+  {"name": "Bandra", "lat": 19.0596, "lon": 72.8295, "severity": 2},
+  {"name": "Powai", "lat": 19.1176, "lon": 72.9060, "severity": 1}
+]

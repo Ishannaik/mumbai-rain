@@ -1,7 +1,7 @@
 {
   "version": 1,
   "trained_at": "2026-06-24T00:00:00Z",
-  "features": ["fc_ecmwf_mm", "fc_bestmatch_mm", "hour_sin", "hour_cos", "recent_rain_mm"],
+  "features": ["fc_bestmatch_mm", "fc_ecmwf_mm", "hour_sin", "hour_cos", "recent_rain_mm"],
   "weights": [1.0, 0.0, 0.0, 0.0, 0.0],
   "intercept": 0.0,
   "champion_mae": null,

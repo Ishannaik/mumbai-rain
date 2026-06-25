@@ -1,0 +1,586 @@
+---
+// Almanac.astro — the shared shell for every page (home + 36 locality pages).
+// Renders the FULL Monsoon Almanac as static HTML (zero-JS, SEO-friendly): the
+// verdict h1 carries real, locality-specific text so the page is meaningful and
+// robust even if the client script never runs. ONE bundled <script> island then
+// hydrates interactivity (geolocate, live fetch, model, gauge, picker, window,
+// rain). Tom Select is loaded from a pinned CDN; the island degrades to the
+// native <select> if it fails.
+import "../styles/almanac.css";
+
+export interface Props {
+  title: string;
+  description: string;
+  /** Static h1 text rendered without JS (e.g. "Rain in Bandra right now"). */
+  heroHeading: string;
+  /** Locality name to pre-select; null = use geolocation (home page). */
+  defaultLocality?: string | null;
+  /** Canonical path, e.g. "/bandra" or "/". */
+  canonicalPath?: string;
+}
+
+const {
+  title,
+  description,
+  heroHeading,
+  defaultLocality = null,
+  canonicalPath = "/",
+} = Astro.props;
+
+const canonical = new URL(canonicalPath, Astro.site).href;
+const TS_VERSION = "2.4.3"; // pinned Tom Select
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <link rel="canonical" href={canonical} />
+  <meta name="theme-color" content="#dde2dc" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="darkreader-lock" />
+
+  <!-- Open Graph / social (helps the locality pages rank + share well) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:url" content={canonical} />
+  <meta name="twitter:card" content="summary" />
+
+  <!-- The Monsoon Almanac's four faces, one combined request:
+       Fraunces (display verdict, incl. 600 for italic emphasis), Newsreader
+       italic (reading voice), IBM Plex Mono incl. 600 (instruments/data),
+       Tiro Devanagari Marathi (पाऊस anchor). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,600;9..144,0,900;9..144,1,600&family=Newsreader:ital,opsz@1,18&family=IBM+Plex+Mono:wght@400;500;600&family=Tiro+Devanagari+Marathi&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Tom Select (pinned). Base theme first so almanac.css overrides win. -->
+  <link
+    rel="stylesheet"
+    href={`https://cdn.jsdelivr.net/npm/tom-select@${TS_VERSION}/dist/css/tom-select.min.css`}
+  />
+  <script
+    is:inline
+    src={`https://cdn.jsdelivr.net/npm/tom-select@${TS_VERSION}/dist/js/tom-select.complete.min.js`}
+  ></script>
+</head>
+<body>
+  <!-- THE RISING WATER — the signature. Visible WITHOUT JS (calm base line);
+       JS only raises/tints it. -->
+  <div id="water" class="water" role="img" aria-label="Calm — no flooding"></div>
+  <aside class="ruler" aria-hidden="true">
+    <span>40</span><span>20</span><span>0</span><span class="unit">mm·h⁻¹</span>
+  </aside>
+  <span id="water-cursor" class="water-cursor" aria-hidden="true">0 mm·h⁻¹</span>
+
+  <!-- THE RAIN — enhancement only; the island paints a <canvas> here and scales it by
+       the verdict's intensity tier, revealing it via .is-raining on <body>.
+       pointer-events:none, behind #app. -->
+  <div id="rain-canvas" class="rain-layer" aria-hidden="true"></div>
+
+  <main id="app" class="state-loading" data-default-locality={defaultLocality ?? ""}>
+    <!-- Masthead: the Marathi anchor (identity, constant ink) + the picker. -->
+    <header class="masthead">
+      <span class="anchor" lang="mr">पाऊस</span>
+      <span class="loc-pill">
+        <span class="loc-pin" aria-hidden="true">📍</span>
+        <select id="locality" aria-label="Choose your Mumbai area">
+          <!-- options injected by the island -->
+        </select>
+      </span>
+    </header>
+
+    <!-- THE VERDICT — the 2-second answer. Static text is real + meaningful
+         (no opacity:0 reveal); the accent colour IS the live state. -->
+    <section class="hero" aria-live="polite">
+      <h1 id="verdict" class="verdict">{heroHeading}</h1>
+      <p id="verdict-sub" class="reading"></p>
+      <!-- Leave-now action — only shown when rain is incoming. -->
+      <p id="leave" class="leave" hidden></p>
+
+      <!-- FORECAST WINDOW — mono segmented control (1h / 2h / 3h / 6h). -->
+      <div class="horizon">
+        <span class="horizon-label" id="horizon-label">Forecast window</span>
+        <div class="segmented" role="group" aria-labelledby="horizon-label">
+          <button type="button" data-h="1" aria-pressed="false">1h</button>
+          <button type="button" data-h="2" aria-pressed="true">2h</button>
+          <button type="button" data-h="3" aria-pressed="false">3h</button>
+          <button type="button" data-h="6" aria-pressed="false">6h</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ground reality — quiet, tabular, like a ticket stub under the headline. -->
+    <dl class="details">
+      <div class="row" id="measured-row">
+        <dt>measured now</dt>
+        <dd id="measured">—</dd>
+      </div>
+      <div class="row" id="flood-row" hidden>
+        <dt>flood watch</dt>
+        <dd id="flood"></dd>
+      </div>
+    </dl>
+
+    <footer class="foot">
+      <p id="honesty" class="honesty">calibrated forecast for your spot</p>
+      <p class="attrib"><a href="https://open-meteo.com/" rel="noopener">Weather data by Open-Meteo.com</a></p>
+    </footer>
+  </main>
+
+  <!-- The single client island. No `is:inline` → Astro bundles it (TypeScript,
+       local imports, dedup). Frameworkless: plain DOM. -->
+  <script>
+    import { verdict } from "../lib/nowcast.js";
+    import { nearestZone, floodRisk } from "../lib/flood.js";
+
+    // --- DOM handles ---
+    const app = document.getElementById("app");
+    const sel = document.getElementById("locality");
+    const locPill = document.querySelector(".loc-pill");
+    const elVerdict = document.getElementById("verdict");
+    const elSub = document.getElementById("verdict-sub");
+    const elLeave = document.getElementById("leave");
+    const elMeasured = document.getElementById("measured");
+    const elFloodRow = document.getElementById("flood-row");
+    const elFlood = document.getElementById("flood");
+    const elHonesty = document.getElementById("honesty");
+    const segBtns = Array.from(document.querySelectorAll(".segmented button"));
+
+    const API = "https://api.open-meteo.com/v1/forecast";
+
+    let MODEL, ZONES, LOCALITIES;
+    let activeLoc = null;     // currently shown {name, lat, lon}
+    let reqToken = 0;         // guards against out-of-order async renders
+    let horizon = 2;          // forecast window in hours (1/2/3/6), default 2
+    let tom = null;           // Tom Select instance, if it initialised
+
+    const json = (path) => fetch(path).then((r) => r.json());
+
+    // Radar-ramp accents (kept in sync with almanac.css :root tokens).
+    const ACCENT = {
+      dry: "#5a8f86", incoming: "#2f7db0", now: "#d98a2b",
+      flood: "#c0392b", error: "#4a5853",
+    };
+
+    // --- Open-Meteo (one keyless fetch) ---
+    async function fetchWeather(lat, lon) {
+      const url =
+        `${API}?latitude=${lat}&longitude=${lon}` +
+        `&hourly=precipitation&current=precipitation,rain,weather_code` +
+        `&forecast_days=2&past_days=1&timezone=Asia%2FKolkata`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`Open-Meteo ${r.status}`);
+      return r.json();
+    }
+
+    // Build the forecast object nowcast.js expects, sliced from the current hour.
+    function shapeForecast(data) {
+      const times = data.hourly.time;
+      const precip = data.hourly.precipitation;
+      const nowStamp = data.current.time.slice(0, 13);
+      let i = times.findIndex((t) => t.slice(0, 13) >= nowStamp);
+      if (i < 0) i = times.length - 1;
+
+      const recentRain = precip
+        .slice(Math.max(0, i - 3), i)
+        .reduce((s, v) => s + (v || 0), 0);
+
+      const fc_bestmatch_mm = precip.slice(i).map((v) => v || 0);
+      return {
+        valid_at: times.slice(i),
+        fc_bestmatch_mm,
+        fc_ecmwf_mm: fc_bestmatch_mm.slice(), // mirror; single-model fetch
+        nowHour: Number(nowStamp.slice(11, 13)),
+        recentRain,
+      };
+    }
+
+    // --- Rendering ---
+    function setState(cls) { app.className = cls; }
+
+    function mixHex(a, b, t) {
+      t = Math.max(0, Math.min(1, t));
+      const pa = [1, 3, 5].map((o) => parseInt(a.slice(o, o + 2), 16));
+      const pb = [1, 3, 5].map((o) => parseInt(b.slice(o, o + 2), 16));
+      const c = pa.map((v, k) => Math.round(v + (pb[k] - v) * t));
+      return "#" + c.map((x) => x.toString(16).padStart(2, "0")).join("");
+    }
+
+    // Maps the verdict to a state name + sets the single live accent. Flood NEVER
+    // recolours the verdict (red is reserved for the flood line + water). Also
+    // toggles the falling-rain enhancement on the "now" state only.
+    function renderVerdict(v) {
+      let state;
+      if (v.willRain && v.startsInHrs === 0) {
+        state = "now";
+        setState("state-now");
+        elVerdict.textContent = "Raining now";
+        elSub.textContent = `~${v.peakMm} mm·h⁻¹ overhead`;
+        app.style.setProperty("--accent", mixHex(ACCENT.now, ACCENT.flood, (v.peakMm - 1) / 8));
+      } else if (v.willRain) {
+        state = "incoming";
+        setState("state-incoming");
+        elVerdict.innerHTML = v.startsInHrs <= 1
+          ? `Rain <em>within the hour.</em>`
+          : `Rain in about <em>~${v.startsInHrs}h.</em>`;
+        elSub.textContent = `peaking ~${v.peakMm} mm·h⁻¹`;
+        app.style.setProperty("--accent", ACCENT.incoming);
+      } else {
+        state = "dry";
+        setState("state-dry");
+        elVerdict.textContent = `Dry for the next ${horizon}h`;
+        elSub.textContent = "Go — no rain at your spot";
+        app.style.setProperty("--accent", ACCENT.dry);
+      }
+      return state;
+    }
+
+    // Map the verdict + flood reading to a rain intensity tier. Rain only falls in the
+    // "raining now" state (startsInHrs === 0); within that, peak mm/h sets the tier, and
+    // a high flood risk escalates to the heaviest, flood-red tier.
+    function rainTier(v, floodLevel) {
+      if (!(v.willRain && v.startsInHrs === 0)) return "none";
+      if (floodLevel === "high") return "flood";
+      if (v.peakMm > 4) return "heavy";
+      if (v.peakMm >= 1) return "rain";
+      return "drizzle";
+    }
+
+    function renderLeave(v) {
+      if (v.willRain && v.startsInHrs > 0) {
+        elLeave.textContent = v.startsInHrs <= 1
+          ? "Leave within the hour to stay dry."
+          : `Leave within ~${v.startsInHrs}h to stay dry.`;
+        elLeave.hidden = false;
+      } else {
+        elLeave.hidden = true;
+      }
+    }
+
+    function renderMeasured(current) {
+      const mm = current && typeof current.precipitation === "number"
+        ? current.precipitation : 0;
+      elMeasured.textContent = `${mm.toFixed(1)} mm`;
+    }
+
+    function renderFlood(loc, v) {
+      const zone = nearestZone(loc.lat, loc.lon, ZONES);
+      const fr = floodRisk(v.peakMm, zone);
+      if (fr.level === "low") {
+        elFloodRow.hidden = true;
+      } else {
+        elFlood.textContent = `⚠ ${fr.reason}`;
+        elFlood.className = fr.level;
+        elFloodRow.hidden = false;
+      }
+      return fr;
+    }
+
+    function renderFooter() {
+      const ver = MODEL.version != null
+        ? `v${MODEL.version}`
+        : (MODEL.trained_at ? MODEL.trained_at.slice(0, 10) : "live");
+      elHonesty.textContent = `calibrated forecast for your spot · model ${ver}`;
+    }
+
+    // --- The rising-water gauge ---
+    const water = (() => {
+      const el = document.getElementById("water");
+      const cursor = document.getElementById("water-cursor");
+      const HEIGHTS = { loading: "10px", dry: "10px", incoming: "14vh", now: "20vh", error: "10px" };
+
+      function setLevel(state, floodLevel, peakMm) {
+        let h = HEIGHTS[state] || "10px";
+        let accent = ACCENT[state] || ACCENT.dry;
+        let aria;
+        if (floodLevel === "high") {
+          h = "30vh"; accent = ACCENT.flood; el.classList.add("flood");
+          aria = "Flood risk high — water rising";
+        } else if (floodLevel === "watch") {
+          h = "24vh"; accent = ACCENT.flood; el.classList.add("flood");
+          aria = "Flood risk — water building";
+        } else {
+          el.classList.remove("flood");
+          aria = state === "incoming" || state === "now"
+            ? "Water level low" : "Calm — no flooding";
+        }
+        el.style.setProperty("--water-h", h);
+        el.style.setProperty("--water-accent", accent);
+        cursor.style.setProperty("--water-h", h);
+        cursor.style.borderColor = accent;
+        cursor.textContent = peakMm > 0 ? `${peakMm} mm·h⁻¹` : "0 mm·h⁻¹";
+        el.setAttribute("aria-label", aria);
+      }
+      return { setLevel };
+    })();
+
+    // --- The falling rain (self-contained <canvas>, parametric by intensity) ---
+    // A tiny main-thread canvas: zero dependencies, $0, and verifiable. The verdict
+    // sets an intensity tier and the loop scales drop count / speed / opacity / streak
+    // length / tint to match. Honours reduced motion (no loop), pauses when the tab is
+    // hidden, and if anything here throws the page is unaffected (it's a try/catch'd
+    // enhancement). Public surface mirrors a particle engine: start() + setTier().
+    const rain = (() => {
+      const host = document.getElementById("rain-canvas");
+      const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const BLUE = "#2f7db0";   // --radar-rain
+      const FLOOD = "#c0392b";  // --radar-flood
+      // density = drops per 100k px² (clamped by cap so big screens don't blizzard),
+      // speed = px/s, op = opacity range, len = streak length px, w = line width.
+      const TIERS = {
+        drizzle: { density: 8,  cap: 60,  speed: 260, op: [.15, .30], len: [10, 18], w: 1.0, color: BLUE },
+        rain:    { density: 22, cap: 150, speed: 430, op: [.22, .44], len: [14, 26], w: 1.1, color: BLUE },
+        heavy:   { density: 47, cap: 240, speed: 620, op: [.30, .55], len: [18, 34], w: 1.3, color: BLUE },
+        flood:   { density: 66, cap: 320, speed: 720, op: [.34, .60], len: [20, 38], w: 1.5, color: FLOOD },
+      };
+      // streak/velocity unit vector — a slight rightward lean (~15°), echoing the
+      // almanac's diagonal motif so the rain reads as wind-driven, not a static grid.
+      const NX = 0.27, NORM = Math.hypot(NX, 1), UX = NX / NORM, UY = 1 / NORM;
+      const rnd = (a, b) => a + Math.random() * (b - a);
+
+      let canvas = null, ctx = null, dpr = 1, W = 0, H = 0;
+      let drops = [], tier = "none", raf = 0, lastT = 0, stopTimer = 0;
+
+      function resize() {
+        if (!canvas) return;
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        W = host.clientWidth; H = host.clientHeight;
+        canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+        canvas.style.width = W + "px"; canvas.style.height = H + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        if (tier !== "none") seed();
+      }
+      function ensureCanvas() {
+        if (canvas) return;
+        canvas = document.createElement("canvas");
+        host.appendChild(canvas);
+        ctx = canvas.getContext("2d");
+        resize();
+        window.addEventListener("resize", resize, { passive: true });
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) { cancelAnimationFrame(raf); raf = 0; }
+          else if (tier !== "none") play();
+        });
+      }
+      function seed() {
+        const t = TIERS[tier]; if (!t) { drops = []; return; }
+        const count = Math.max(8, Math.min(t.cap, Math.round(t.density * (W * H) / 100000)));
+        drops = Array.from({ length: count }, () => ({
+          x: rnd(-0.1 * W, 1.1 * W), y: rnd(-H, H),
+          len: rnd(t.len[0], t.len[1]), op: rnd(t.op[0], t.op[1]), v: t.speed * rnd(0.85, 1.15),
+        }));
+      }
+      function frame(now) {
+        raf = requestAnimationFrame(frame);
+        const t = TIERS[tier]; if (!t || !ctx) return;
+        const dt = Math.min(0.05, (now - lastT) / 1000 || 0); lastT = now;
+        ctx.clearRect(0, 0, W, H);
+        ctx.lineWidth = t.w; ctx.lineCap = "round"; ctx.strokeStyle = t.color;
+        for (const d of drops) {
+          d.x += d.v * UX * dt; d.y += d.v * UY * dt;
+          if (d.y - d.len > H || d.x - d.len > W + 24) {           // off-screen → respawn at top
+            d.x = rnd(-0.1 * W, 1.1 * W); d.y = rnd(-0.3 * H, -d.len);
+            d.len = rnd(t.len[0], t.len[1]); d.op = rnd(t.op[0], t.op[1]); d.v = t.speed * rnd(0.85, 1.15);
+          }
+          ctx.globalAlpha = d.op;
+          ctx.beginPath();
+          ctx.moveTo(d.x, d.y);
+          ctx.lineTo(d.x - d.len * UX, d.y - d.len * UY);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      function play() { if (raf) return; lastT = performance.now(); raf = requestAnimationFrame(frame); }
+      function stop() { if (raf) { cancelAnimationFrame(raf); raf = 0; } if (ctx) ctx.clearRect(0, 0, W, H); }
+
+      function start() { /* canvas needs no preload — kept for API symmetry */ }
+
+      function setTier(next) {
+        document.body.dataset.rain = next;             // inspectable state hook
+        if (REDUCED) return;                           // reduced motion → no animated rain
+        const want = TIERS[next] ? next : "none";
+        if (want === tier) return;
+        try {
+          tier = want;
+          if (tier === "none") {
+            document.body.classList.remove("is-raining");        // CSS fades the layer out
+            clearTimeout(stopTimer);
+            stopTimer = setTimeout(stop, 800);                   // keep falling briefly mid-fade
+            return;
+          }
+          clearTimeout(stopTimer);
+          ensureCanvas();
+          seed();                                                // rebuild drops for the new tier
+          document.body.classList.add("is-raining");             // CSS fades the layer in
+          play();
+        } catch (err) {
+          console.error("Rain effect failed; continuing without it.", err);
+        }
+      }
+
+      return { start, setTier };
+    })();
+
+    function renderError(headline, detail) {
+      setState("state-error");
+      app.style.setProperty("--accent", ACCENT.error);
+      elVerdict.textContent = headline;
+      elSub.textContent = detail;
+      elLeave.hidden = true;
+      elFloodRow.hidden = true;
+      rain.setTier("none");
+      water.setLevel("error", "low", 0);
+    }
+
+    async function render(loc) {
+      const token = ++reqToken;
+      activeLoc = loc;
+
+      if (!navigator.onLine) {
+        renderError("You're offline", "Reconnect, then tap your area to retry.");
+        return;
+      }
+
+      setState("state-loading");
+      app.style.setProperty("--accent", ACCENT.dry);
+      elVerdict.textContent = "Reading the sky…";
+      elSub.textContent = "";
+      rain.setTier("none");
+
+      try {
+        const data = await fetchWeather(loc.lat, loc.lon);
+        if (token !== reqToken) return;
+
+        const fc = shapeForecast(data);
+        if (!fc.valid_at.length) {
+          renderError("No reading right now", "Open-Meteo has no data for this spot yet. Try another area.");
+          return;
+        }
+
+        // verdict() takes the user-chosen window — timing copy stays honest.
+        const v = verdict(MODEL, fc, fc.nowHour, fc.recentRain, horizon);
+        const state = renderVerdict(v);
+        renderLeave(v);
+        renderMeasured(data.current);
+        const fr = renderFlood(loc, v);
+        water.setLevel(state, fr.level, v.peakMm);
+        rain.setTier(rainTier(v, fr.level));
+      } catch (err) {
+        if (token !== reqToken) return;
+        renderError("Can't reach the forecast", "Check your connection, then tap your area to retry.");
+        console.error(err);
+      }
+    }
+
+    // --- Location resolution ---
+    function nearestLocality(lat, lon) {
+      let best = LOCALITIES[0], bestD = Infinity;
+      for (const l of LOCALITIES) {
+        const d = (l.lat - lat) ** 2 + (l.lon - lon) ** 2;
+        if (d < bestD) { bestD = d; best = l; }
+      }
+      return best;
+    }
+
+    // Set both the native <select> and Tom Select (silently — no render loop).
+    function selectIndex(idx) {
+      if (idx < 0) return;
+      sel.value = String(idx);
+      if (tom) tom.setValue(String(idx), true);
+    }
+
+    function resolveAndRender() {
+      // Locality (SEO) pages pin a default; the home page uses geolocation.
+      const pinned = (app.dataset.defaultLocality || "").trim();
+      if (pinned) {
+        const idx = LOCALITIES.findIndex((l) => l.name === pinned);
+        if (idx >= 0) { selectIndex(idx); render(LOCALITIES[idx]); return; }
+      }
+      if (!navigator.geolocation) { render(LOCALITIES[0]); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const here = nearestLocality(pos.coords.latitude, pos.coords.longitude);
+          // Use the user's real coords for accuracy, label with the nearest area.
+          const loc = { name: here.name, lat: pos.coords.latitude, lon: pos.coords.longitude };
+          selectIndex(LOCALITIES.findIndex((l) => l.name === here.name));
+          render(loc);
+        },
+        () => render(LOCALITIES[0]),
+        { timeout: 8000, maximumAge: 600000 }
+      );
+    }
+
+    // --- Feature 1: searchable picker (Tom Select), Almanac-themed ---
+    function initPicker() {
+      LOCALITIES.forEach((l, i) => sel.add(new Option(l.name, String(i))));
+      // Native fallback always works (no-JS keeps the bare <select>, and this
+      // listener covers the case where Tom Select fails to load).
+      sel.addEventListener("change", () => render(LOCALITIES[Number(sel.value)]));
+
+      if (typeof window.TomSelect === "function") {
+        try {
+          tom = new window.TomSelect(sel, {
+            maxOptions: null,
+            searchField: ["text"],
+            sortField: { field: "text", direction: "asc" },
+            placeholder: "Search area…",
+            controlInput: '<input type="text" autocomplete="off" />',
+            onChange: (val) => {
+              if (val === "" || val == null) return;
+              render(LOCALITIES[Number(val)]);
+            },
+          });
+          locPill.classList.add("ts-enhanced");
+        } catch (err) {
+          console.error("Tom Select init failed; using native select.", err);
+        }
+      }
+    }
+
+    // --- Feature 2: forecast-window selector ---
+    function initHorizon() {
+      segBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const h = Number(btn.dataset.h);
+          if (h === horizon) return;
+          horizon = h;
+          segBtns.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+          if (activeLoc) render(activeLoc); // re-run verdict() over the new window
+        });
+      });
+    }
+
+    // --- Boot ---
+    async function init() {
+      try {
+        [ZONES, LOCALITIES, MODEL] = await Promise.all([
+          json("/data/flood-zones.json"),
+          json("/data/localities.json"),
+          json("/model.json"),
+        ]);
+      } catch (err) {
+        renderError("Couldn't load the app", "Refresh the page to try again.");
+        console.error(err);
+        return;
+      }
+
+      initPicker();
+      initHorizon();
+      rain.start();
+      window.addEventListener("online", () => { if (activeLoc) render(activeLoc); });
+
+      renderFooter();
+      resolveAndRender();
+    }
+
+    init();
+  </script>
+</body>
+</html>

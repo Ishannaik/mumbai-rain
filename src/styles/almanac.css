@@ -1,0 +1,336 @@
+/* पाऊस — The Mumbai Monsoon Almanac.
+   Wet-newsprint paper + storm ink, near-monochrome. The IMD radar reflectivity
+   ramp appears ONLY as data-ink on the live reading — one accent at a time.
+   The signature is the rising water read off an engraved rainfall ruler.
+   Mobile-first to 360px. Content is readable without JS (no opacity:0 reveals). */
+
+:root {
+  /* --- paper & ink (always-on almanac surfaces) --- */
+  --paper:   #dde2dc;   /* wet newsprint — cool grey-green, NOT cream */
+  --paper-2: #d3d9d2;   /* plate / card surface, a half-tone deeper */
+  --paper-3: #c7cec6;   /* deepest tint */
+  --ink:     #16221f;   /* storm ink — display + body text + the 2px rule */
+  --ink-soft:#4a5853;   /* wet stone — captions, mono labels, secondary */
+  --rule:    #a9b3ac;   /* hairline ink */
+  --rule-soft:#bdc5be;
+
+  /* --- radar reflectivity as data-ink (one hue lit at a time) --- */
+  --radar-dry:  #5a8f86; /* sea-glass — dry / off the ramp */
+  --radar-rain: #2f7db0; /* radar blue — rain incoming (most-shown state) */
+  --radar-now:  #d98a2b; /* amber — raining now */
+  --radar-flood:#c0392b; /* flood red — reserved: flood line + water only */
+  --storm-gold: #e8b25a; /* the single storm-light glint — flood water only */
+
+  /* the single live accent; state classes set it, JS may refine it (now-blend) */
+  --accent: var(--radar-dry);
+  --water-accent: var(--accent);
+  --water-h: 10px;       /* current waterline height */
+
+  /* rhythm */
+  --s-3:12px; --s-4:16px; --s-5:24px; --s-6:34px; --s-7:52px;
+
+  color-scheme: only light;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; background: var(--paper); }
+
+body {
+  min-height: 100svh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Newsreader", Georgia, serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* faint letterpress tooth (decorative, behind everything, never hides content) */
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+  background:
+    radial-gradient(120% 70% at 88% -8%, rgba(22,34,31,.05), transparent 60%),
+    radial-gradient(100% 60% at -6% 108%, rgba(22,34,31,.04), transparent 60%);
+}
+
+/* ================= THE RISING WATER (signature) ================= */
+/* Fixed to the bottom of the viewport, behind all content. Rises with risk. */
+.water {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 0;
+  height: var(--water-h);
+  pointer-events: none;
+  border-top: 2px solid var(--water-accent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--water-accent) 12%, transparent),
+    color-mix(in srgb, var(--water-accent) 30%, transparent));
+}
+/* a single warm storm-light glint — flood state only */
+.water.flood::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 46px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--storm-gold) 42%, transparent), transparent);
+  mix-blend-mode: screen; opacity: .55; pointer-events: none;
+}
+
+/* engraved rainfall ruler down the right edge of the water zone */
+.ruler {
+  position: fixed; right: 6px; bottom: 0; z-index: 1; height: 30vh; width: 22px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  align-items: flex-end; pointer-events: none;
+  font-family: "IBM Plex Mono", monospace; font-size: .55rem;
+  color: var(--ink-soft); font-variant-numeric: tabular-nums;
+}
+.ruler span { position: relative; padding-right: 9px; }
+.ruler span::after {
+  content: ""; position: absolute; right: 0; top: 50%; width: 6px; height: 1px;
+  background: var(--rule);
+}
+.ruler .unit { opacity: .8; }
+.ruler .unit::after { display: none; }
+
+/* live numeric cursor pinned at the waterline */
+.water-cursor {
+  position: fixed; right: 32px; bottom: var(--water-h); z-index: 2;
+  transform: translateY(50%); pointer-events: none;
+  font-family: "IBM Plex Mono", monospace; font-size: .6rem; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--water-accent);
+  padding: 1px 6px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+/* ================= THE RAIN (enhancement: scales with intensity) ================= */
+/* A self-contained <canvas> of radar-blue streaks the island paints here, fixed behind
+   #app (z-index 0, same plane as the water), pointer-events:none so it never blocks a
+   tap. The island scales drop density/speed/opacity/tint to the verdict's intensity
+   tier (drizzle → rain → heavy → flood; flood tints red). Revealed only when <body> has
+   .is-raining; under reduced motion it's hidden and the loop never starts. */
+.rain-layer {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .7s ease;
+}
+.is-raining .rain-layer { opacity: 1; }
+.rain-layer canvas { display: block; pointer-events: none; }
+
+/* ================= layout shell — the phone-height "rain ticket" ================= */
+#app {
+  position: relative; z-index: 1;
+  width: min(92vw, 30rem); margin: 0 auto;
+  min-height: 100svh;
+  display: flex; flex-direction: column;
+  gap: var(--s-5);
+  padding:
+    max(var(--s-5), env(safe-area-inset-top))
+    max(26px, env(safe-area-inset-right))
+    max(var(--s-5), env(safe-area-inset-bottom))
+    max(var(--s-5), env(safe-area-inset-left));
+}
+
+/* ---- masthead: Marathi anchor + location pill ---- */
+.masthead {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: var(--s-4); flex-wrap: wrap;
+  border-bottom: 2px solid var(--ink); padding-bottom: var(--s-3);
+}
+.anchor {
+  font-family: "Tiro Devanagari Marathi", serif;
+  font-size: clamp(2rem, 9vw, 2.8rem); line-height: .86; color: var(--ink);
+}
+/* native pill — the no-JS / Tom-Select-failed fallback */
+.loc-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid var(--rule); background: var(--paper-2);
+  border-radius: 999px; padding: 2px 12px 2px 12px;
+}
+.loc-pill::after {
+  content: "\25BE"; color: var(--ink-soft); font-size: .8rem;
+  padding-left: 2px; pointer-events: none;
+}
+.loc-pin { font-size: .8rem; line-height: 1; }
+#locality {
+  appearance: none; -webkit-appearance: none;
+  background: transparent; border: 0; color: var(--ink);
+  font-family: "IBM Plex Mono", monospace; font-weight: 500;
+  font-size: .92rem; letter-spacing: .01em;
+  padding: 11px 2px 11px 2px;  /* ≥44px touch target */
+  cursor: pointer;
+}
+#locality:focus-visible {
+  outline: 2px solid var(--ink); outline-offset: 4px; border-radius: 6px;
+}
+/* When Tom Select takes over, hide the bare pill chrome (the arrow + border come
+   from .ts-wrapper). The native <select> is removed from flow by Tom Select. */
+.loc-pill.ts-enhanced { border: 0; background: transparent; padding: 0; }
+.loc-pill.ts-enhanced::after { content: none; }
+.loc-pill.ts-enhanced .loc-pin { display: none; }
+
+/* ---- hero verdict — the 2-second answer ---- */
+.hero {
+  flex: 1 1 auto;
+  display: flex; flex-direction: column; justify-content: center;
+  min-height: 0; gap: var(--s-4);
+}
+.verdict {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 900; font-variation-settings: "opsz" 144;
+  font-size: clamp(2.4rem, 11vw, 4.6rem);
+  line-height: .95; letter-spacing: -.02em;
+  text-wrap: balance;
+  color: var(--accent);            /* colour IS the live reading */
+}
+.verdict em {                       /* the emphasis word: the human voice */
+  font-style: italic; font-weight: 600; color: var(--accent);
+}
+.reading {
+  font-family: "IBM Plex Mono", monospace; font-size: .85rem;
+  letter-spacing: .01em; color: var(--ink-soft);
+  font-variant-numeric: tabular-nums; min-height: 1em;
+}
+
+/* ---- leave-now action (solid colour, never background-clip) ---- */
+.leave {
+  display: flex; align-items: baseline; gap: .55em;
+  padding: 12px 0 12px 16px; border-left: 3px solid var(--accent);
+  font-family: "Newsreader", serif; font-style: italic;
+  font-size: 1.12rem; color: var(--ink);
+}
+.leave::before {
+  content: "\25B8"; font-family: "IBM Plex Mono", monospace; font-style: normal;
+  font-weight: 600; color: var(--accent); flex: none;
+}
+.leave[hidden] { display: none; }
+
+/* ---- forecast-window selector (mono segmented control) ---- */
+.horizon { display: flex; flex-direction: column; gap: 8px; }
+.horizon-label {
+  font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft);
+}
+.segmented {
+  display: inline-flex; align-self: flex-start;
+  border: 1px solid var(--rule); background: var(--paper-2);
+}
+.segmented button {
+  appearance: none; background: transparent; border: 0; cursor: pointer;
+  font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: .82rem;
+  color: var(--ink-soft); padding: 9px 15px; min-width: 46px; min-height: 40px;
+  border-left: 1px solid var(--rule);
+  font-variant-numeric: tabular-nums; transition: color .2s ease, background .2s ease;
+}
+.segmented button:first-child { border-left: 0; }
+.segmented button:hover { color: var(--ink); }
+.segmented button[aria-pressed="true"] {
+  background: var(--ink); color: var(--paper);
+}
+.segmented button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ---- detail rows (quiet, tabular) ---- */
+.details { display: flex; flex-direction: column; }
+.row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s-4); padding: var(--s-3) 0; border-top: 1px solid var(--rule);
+}
+.row[hidden] { display: none; }
+.row dt {
+  font-family: "IBM Plex Mono", monospace; font-size: .68rem;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft);
+}
+.row dd {
+  font-family: "IBM Plex Mono", monospace; font-size: .85rem;
+  font-variant-numeric: tabular-nums; text-align: right; color: var(--ink);
+}
+/* flood line — the only place red appears in text */
+#flood { font-family: "Newsreader", serif; font-style: italic; }
+#flood.high  { color: var(--radar-flood); font-weight: 600; }
+#flood.watch { color: var(--radar-flood); }
+
+/* ---- footer: honesty + required attribution ---- */
+.foot {
+  display: flex; flex-direction: column; gap: 3px;
+  font-family: "IBM Plex Mono", monospace; font-size: .7rem;
+  color: var(--ink-soft); letter-spacing: .02em;
+}
+.honesty { font-variant-numeric: tabular-nums; }
+.attrib a { color: var(--radar-rain); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.attrib a:hover, .attrib a:focus-visible { color: var(--ink); }
+
+/* ================= state → accent (exactly one hue lit) ================= */
+.state-loading { --accent: var(--radar-dry); }
+.state-dry     { --accent: var(--radar-dry); }
+.state-incoming{ --accent: var(--radar-rain); }
+.state-now     { --accent: var(--radar-now); }   /* JS refines hotter by mm/h */
+.state-error   { --accent: var(--ink-soft); }    /* neutral: no live reading */
+.water { --water-accent: var(--accent); }         /* default; flood tints red via JS */
+
+/* loading placeholder reads as a whisper, not a spinner that never resolves */
+.state-loading .verdict { color: var(--ink-soft); }
+
+/* ================= Tom Select — themed to the Almanac (NOT default blue/white) ================= */
+/* Overrides the CDN base theme: wet-newsprint surfaces, storm ink, mono type,
+   the radar-rain hue ONLY on the active/selected row. Zero border-radius. */
+.ts-wrapper { width: auto; min-width: 9.5rem; }
+.ts-wrapper.single .ts-control,
+.ts-control {
+  background: var(--paper-2); border: 1px solid var(--rule);
+  border-radius: 999px; box-shadow: none; color: var(--ink);
+  font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: .92rem;
+  padding: 9px 30px 9px 14px; min-height: 44px;
+}
+.ts-wrapper.single.input-active .ts-control,
+.ts-wrapper.single .ts-control { cursor: pointer; }
+.ts-control input, .ts-control input::placeholder {
+  color: var(--ink-soft); font-family: "IBM Plex Mono", monospace;
+}
+.ts-wrapper.single .ts-control:not(.rt-mode)::after {
+  content: ""; position: absolute; top: 50%; right: 14px; margin-top: -3px;
+  border-style: solid; border-width: 5px 4px 0 4px;
+  border-color: var(--ink-soft) transparent transparent transparent;
+}
+.ts-wrapper.focus .ts-control {
+  border-color: var(--ink); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 16%, transparent);
+}
+.ts-dropdown {
+  background: var(--paper); border: 1px solid var(--ink); border-radius: 0;
+  box-shadow: 0 10px 28px rgba(22,34,31,.18); margin-top: 5px;
+  color: var(--ink); font-family: "IBM Plex Mono", monospace;
+}
+.ts-dropdown .ts-dropdown-content { padding: 3px; }
+.ts-dropdown .option {
+  border-radius: 0; padding: 9px 12px; font-size: .86rem; color: var(--ink);
+}
+.ts-dropdown .option:hover,
+.ts-dropdown .active {
+  background: var(--ink); color: var(--paper);
+}
+.ts-dropdown .option .highlight,
+.ts-dropdown .active .highlight {
+  background: color-mix(in srgb, var(--radar-rain) 50%, transparent);
+  border-radius: 0; box-shadow: 0 1px 0 var(--radar-rain);
+}
+.ts-dropdown .no-results { padding: 9px 12px; font-size: .82rem; color: var(--ink-soft); }
+.ts-wrapper.single .ts-control, .ts-dropdown, .ts-control input { line-height: 1.3; }
+
+/* ================= motion (enhancement only; never hides content) ================= */
+.water { transition: height .6s cubic-bezier(.2,.7,.2,1),
+                     border-color .4s ease, background .4s ease; }
+.water-cursor { transition: bottom .6s cubic-bezier(.2,.7,.2,1), border-color .4s ease; }
+.verdict, .leave, #flood { transition: color .4s ease, border-color .4s ease; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .water { animation: swell 6.5s ease-in-out infinite alternate; }
+  @keyframes swell { from { transform: translateY(3px); } to { transform: translateY(0); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .water, .water-cursor, .verdict, .leave, #flood { transition: none; }
+  /* No animated rain under reduced motion — the JS engine is skipped too. */
+  .rain-layer { display: none; }
+}
+
+/* ================= focus + responsive ================= */
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+@media (max-width: 380px) {
+  .masthead { gap: var(--s-3); }
+  #app { gap: var(--s-4); }
+  .segmented button { padding: 9px 12px; min-width: 42px; }
+}
