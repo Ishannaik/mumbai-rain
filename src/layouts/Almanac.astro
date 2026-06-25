@@ -75,7 +75,7 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
        JS only raises/tints it. -->
   <div id="water" class="water" role="img" aria-label="Calm — no flooding"></div>
   <aside class="ruler" aria-hidden="true">
-    <span>40</span><span>20</span><span>0</span><span class="unit">mm·h⁻¹</span>
+    <span>40</span><span>20</span><span>0</span>
   </aside>
   <span id="water-cursor" class="water-cursor" aria-hidden="true">0 mm·h⁻¹</span>
 
@@ -296,22 +296,23 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
     const water = (() => {
       const el = document.getElementById("water");
       const cursor = document.getElementById("water-cursor");
-      const HEIGHTS = { loading: "10px", dry: "10px", incoming: "14vh", now: "20vh", error: "10px" };
+      const RULER_VH = 30;   // .ruler height; ticks at 0 (bottom) / 20 (mid) / 40 (top)
+      const RULER_MAX = 40;  // mm·h⁻¹ at the top of the ruler
 
+      // Height maps peakMm onto the ruler scale so the cursor's number sits at its
+      // actual tick (0.7mm -> just above "0", 20mm -> the "20" tick). Flood risk only
+      // RE-TINTS the water red — it never fakes the height (the ruler is mm·h⁻¹, honest).
       function setLevel(state, floodLevel, peakMm) {
-        let h = HEIGHTS[state] || "10px";
+        const mm = Math.max(0, Math.min(RULER_MAX, peakMm || 0));
+        const h = ((mm / RULER_MAX) * RULER_VH).toFixed(2) + "vh";
         let accent = ACCENT[state] || ACCENT.dry;
         let aria;
-        if (floodLevel === "high") {
-          h = "30vh"; accent = ACCENT.flood; el.classList.add("flood");
-          aria = "Flood risk high — water rising";
-        } else if (floodLevel === "watch") {
-          h = "24vh"; accent = ACCENT.flood; el.classList.add("flood");
-          aria = "Flood risk — water building";
+        if (floodLevel === "high" || floodLevel === "watch") {
+          accent = ACCENT.flood; el.classList.add("flood");
+          aria = floodLevel === "high" ? "Flood risk high — heavy rain" : "Flood watch — rain building";
         } else {
           el.classList.remove("flood");
-          aria = state === "incoming" || state === "now"
-            ? "Water level low" : "Calm — no flooding";
+          aria = mm > 0 ? `Rain about ${peakMm} mm per hour` : "Calm — no flooding";
         }
         el.style.setProperty("--water-h", h);
         el.style.setProperty("--water-accent", accent);
