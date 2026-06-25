@@ -159,6 +159,8 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
     let activeLoc = null;     // currently shown {name, lat, lon}
     let reqToken = 0;         // guards against out-of-order async renders
     let horizon = 2;          // forecast window in hours (1/2/3/6), default 2
+    let lastFc = null;        // cached shaped forecast (so window changes don't re-fetch)
+    let lastCurrent = null;   // cached current-conditions block
     let tom = null;           // Tom Select instance, if it initialised
 
     const json = (path) => fetch(path).then((r) => r.json());
@@ -222,7 +224,7 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
         state = "now";
         setState("state-now");
         elVerdict.textContent = "Raining now";
-        elSub.textContent = `~${v.peakMm} mm·h⁻¹ overhead`;
+        elSub.textContent = `~${v.peakMm} mm·h⁻¹ peak · next ${horizon}h`;
         app.style.setProperty("--accent", mixHex(ACCENT.now, ACCENT.flood, (v.peakMm - 1) / 8));
       } else if (v.willRain) {
         state = "incoming";
@@ -230,7 +232,7 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
         elVerdict.innerHTML = v.startsInHrs <= 1
           ? `Rain <em>within the hour.</em>`
           : `Rain in about <em>~${v.startsInHrs}h.</em>`;
-        elSub.textContent = `peaking ~${v.peakMm} mm·h⁻¹`;
+        elSub.textContent = `peaks ~${v.peakMm} mm·h⁻¹ · next ${horizon}h`;
         app.style.setProperty("--accent", ACCENT.incoming);
       } else {
         state = "dry";
@@ -439,6 +441,20 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
       water.setLevel("error", "low", 0);
     }
 
+    // Compute + paint the verdict from the cached forecast for the current window.
+    // Called after a fetch (render) AND directly on forecast-window changes —
+    // so switching 1h/2h/3h/6h is instant and never re-fetches.
+    function paintVerdict() {
+      if (!lastFc) return;
+      const v = verdict(MODEL, lastFc, lastFc.nowHour, lastFc.recentRain, horizon);
+      const state = renderVerdict(v);
+      renderLeave(v);
+      renderMeasured(lastCurrent);
+      const fr = renderFlood(activeLoc, v);
+      water.setLevel(state, fr.level, v.peakMm);
+      rain.setTier(rainTier(v, fr.level));
+    }
+
     async function render(loc) {
       const token = ++reqToken;
       activeLoc = loc;
@@ -464,14 +480,11 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
           return;
         }
 
-        // verdict() takes the user-chosen window — timing copy stays honest.
-        const v = verdict(MODEL, fc, fc.nowHour, fc.recentRain, horizon);
-        const state = renderVerdict(v);
-        renderLeave(v);
-        renderMeasured(data.current);
-        const fr = renderFlood(loc, v);
-        water.setLevel(state, fr.level, v.peakMm);
-        rain.setTier(rainTier(v, fr.level));
+        // Cache so changing the forecast window re-computes instantly (no re-fetch,
+        // no loading flash) — paintVerdict() reuses this same forecast.
+        lastFc = fc;
+        lastCurrent = data.current;
+        paintVerdict();
       } catch (err) {
         if (token !== reqToken) return;
         renderError("Can't reach the forecast", "Check your connection, then tap your area to retry.");
@@ -552,7 +565,10 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
           if (h === horizon) return;
           horizon = h;
           segBtns.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
-          if (activeLoc) render(activeLoc); // re-run verdict() over the new window
+          // Re-run verdict() over the new window using the cached forecast — instant,
+          // no re-fetch. Fall back to a fetch only if we have no forecast yet.
+          if (lastFc) paintVerdict();
+          else if (activeLoc) render(activeLoc);
         });
       });
     }
