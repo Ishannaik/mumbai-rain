@@ -1,0 +1,36 @@
+name: collect
+
+# The heartbeat: runs the logger every hour and commits new rows to data/log.csv.
+# This is what makes the system self-collecting — runs free on GitHub's runners, 24/7,
+# with your computer off. $0 on public repos.
+on:
+  schedule:
+    - cron: "5 * * * *"      # every hour at :05 (UTC). GitHub may delay under load — fine.
+  workflow_dispatch: {}        # lets you trigger it by hand to test
+
+permissions:
+  contents: write              # needed to commit log.csv back
+
+concurrency:
+  group: collect               # never run two collectors at once
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install deps
+        run: uv sync --frozen
+      - name: Log one snapshot (forecast + backfill METAR labels)
+        run: uv run python -m pipeline.log_snapshot
+      - name: Commit new rows
+        run: |
+          git config user.name "rain-bot"
+          git config user.email "rain-bot@users.noreply.github.com"
+          git add data/log.csv
+          git diff --cached --quiet || git commit -m "data: hourly snapshot [skip ci]"
+          git push

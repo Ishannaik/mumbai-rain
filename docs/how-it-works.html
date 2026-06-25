@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<title>How it works — Mumbai Rain, module by module</title>
+<style>
+  :root{ --paper:#dde2dc; --ink:#16221f; --soft:#5c6f6a; --line:#b9c4bf;
+         --rain:#2f6f93; --good:#2f7d4f; --plan:#9a6a2f; --chip:#cfd8d2; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font:17px/1.65 system-ui,-apple-system,Segoe UI,sans-serif;}
+  .wrap{max-width:820px;margin:0 auto;padding:48px 22px 96px}
+  h1{font-size:2rem;line-height:1.1;margin:0 0 6px}
+  .sub{color:var(--soft);font-size:1.05rem;margin:0 0 36px}
+  h2{font-size:1.35rem;margin:46px 0 10px;padding-top:18px;border-top:2px solid var(--ink)}
+  h3{font-size:1.05rem;margin:26px 0 4px}
+  p{margin:8px 0}
+  code{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;background:var(--chip);
+       padding:1px 6px;border-radius:5px;font-size:.9em}
+  .lead{font-size:1.1rem}
+  .analogy{background:#e7ece8;border-left:3px solid var(--rain);padding:10px 16px;margin:10px 0;border-radius:0 8px 8px 0}
+  .analogy b{color:var(--rain)}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:.95rem}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--soft);font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+  .tag{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .built{background:#d4e8da;color:var(--good)}
+  .planned{background:#efe2cf;color:var(--plan)}
+  .flow{background:#e7ece8;border:1px solid var(--line);border-radius:10px;padding:18px;
+        margin:18px 0;font-family:ui-monospace,monospace;font-size:.86rem;line-height:1.5;white-space:pre;overflow-x:auto}
+  .num{display:inline-block;width:1.6em;color:var(--rain);font-weight:700}
+  ul{margin:8px 0 8px 0;padding-left:22px} li{margin:4px 0}
+  .io{font-size:.92rem;color:var(--soft);margin:4px 0}
+  .io b{color:var(--ink)}
+  footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);color:var(--soft);font-size:.9rem}
+
+  /* ---------- ANIMATED DIAGRAMS (progressive enhancement only) ---------- */
+  /* All diagrams render a sensible static final frame with JS off. JS/anime.js
+     only ADDS motion. Nothing here hides content. */
+  :root{ --glow:#54a8d6; --droplet:#2f6f93; }
+
+  /* Hero pipeline */
+  .diagram{margin:22px 0}
+  .hero-pipe{background:#e7ece8;border:1px solid var(--line);border-radius:12px;
+             padding:18px 14px;overflow:hidden}
+  .hero-pipe svg{width:100%;height:auto;display:block;max-width:760px;margin:0 auto}
+  .hero-cap{color:var(--soft);font-size:.82rem;text-align:center;margin:6px 0 0}
+  .stage-box{fill:#dde2dc;stroke:var(--line);stroke-width:1.5;transition:fill .3s,stroke .3s}
+  .stage-box.lit{fill:#d7e6ee;stroke:var(--rain)}
+  .stage-label{fill:var(--ink);font:700 12px ui-monospace,monospace;text-anchor:middle}
+  .stage-sub{fill:var(--soft);font:9px system-ui,sans-serif;text-anchor:middle}
+  .stage-num{fill:var(--rain);font:700 11px ui-monospace,monospace;text-anchor:middle}
+  .pipe-line{stroke:var(--line);stroke-width:2;fill:none}
+  .pipe-arrow{fill:var(--soft)}
+  .packet{fill:var(--droplet)}
+  .packet-glow{fill:var(--glow);opacity:.35}
+
+  /* Self-improving loop */
+  .loop-fig{background:#e7ece8;border:1px solid var(--line);border-radius:12px;padding:18px 14px}
+  .loop-fig svg{width:100%;height:auto;display:block;max-width:560px;margin:0 auto}
+  .loop-ring{fill:none;stroke:var(--rain);stroke-width:3;opacity:.85}
+  .loop-arrowhead{fill:var(--rain)}
+  .beat-core{fill:var(--rain)}
+  .beat-pulse{fill:none;stroke:var(--rain);stroke-width:2;opacity:0}
+  .diary-row{fill:var(--chip);stroke:var(--line);stroke-width:1}
+  .diary-row.filled{fill:#d4e8da}
+  .sharp-bar{fill:var(--good)}
+  .loop-txt{fill:var(--soft);font:10px system-ui,sans-serif;text-anchor:middle}
+  .loop-txt-strong{fill:var(--ink);font:700 11px system-ui,sans-serif;text-anchor:middle}
+
+  /* Per-module micro diagrams */
+  .micro{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+         background:#eef2ee;border:1px dashed var(--line);border-radius:9px;
+         padding:10px 14px;margin:12px 0;font-size:.84rem}
+  .micro .node{font-family:ui-monospace,monospace;background:#dde2dc;border:1px solid var(--line);
+               border-radius:6px;padding:4px 9px;white-space:nowrap}
+  .micro .node.proc{background:#d7e6ee;border-color:var(--rain);color:var(--rain);font-weight:700}
+  .micro .node.out{background:#d4e8da;border-color:var(--good);color:var(--good)}
+  .micro .marrow{position:relative;width:34px;height:14px;flex:0 0 auto}
+  .micro .marrow svg{width:100%;height:100%;display:block}
+  .micro .mtrack{stroke:var(--line);stroke-width:2;fill:none}
+  .micro .mdot{fill:var(--rain);opacity:.9}
+
+  /* End-to-end verdict sequence */
+  .seq{background:#e7ece8;border:1px solid var(--line);border-radius:12px;padding:18px 14px;margin:18px 0}
+  .seq svg{width:100%;height:auto;display:block;max-width:720px;margin:0 auto}
+  .seq-box{fill:#dde2dc;stroke:var(--line);stroke-width:1.5;transition:fill .3s,stroke .3s}
+  .seq-box.lit{fill:#d7e6ee;stroke:var(--rain)}
+  .seq-label{fill:var(--ink);font:700 11px ui-monospace,monospace;text-anchor:middle}
+  .seq-sub{fill:var(--soft);font:8.5px system-ui,sans-serif;text-anchor:middle}
+  .seq-flow{stroke:var(--rain);stroke-width:2;fill:none;opacity:.5}
+  .seq-token{fill:var(--droplet)}
+  .seq-verdict{fill:var(--good);font:700 13px system-ui,sans-serif;text-anchor:middle}
+
+  @media (max-width:540px){
+    .micro{font-size:.8rem;gap:7px;padding:9px 11px}
+    .hero-cap{font-size:.76rem}
+  }
+  @media (prefers-reduced-motion: reduce){
+    /* Static final frame only — JS checks this too and skips all animation. */
+    .stage-box{fill:#d7e6ee;stroke:var(--rain)}
+    .seq-box{fill:#d7e6ee;stroke:var(--rain)}
+    .diary-row{fill:#d4e8da}
+    .packet,.packet-glow,.beat-pulse,.mdot,.seq-token{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>How the Mumbai Rain app works</h1>
+  <p class="sub">Every module, in plain English — what it is, what it does, and how they fit together.</p>
+
+  <p class="lead">The whole app answers one question: <b>“Will it rain at my Mumbai spot in the next 2 hours?”</b>
+  It does that by taking a free global weather forecast, learning how that forecast is <em>usually wrong for Mumbai</em>,
+  and correcting it. Below is each part of the machine.</p>
+
+  <div class="analogy"><b>The one-line analogy:</b> imagine a weather forecaster who’s often wrong in the same ways.
+  You keep a diary of “what they predicted” vs “what actually happened,” spot their habits (“they always over-warn at 2pm”),
+  and from then on you mentally correct them. This app is that diary + that correction, automated and free.</div>
+
+  <div class="diagram hero-pipe" id="heroPipe">
+    <svg viewBox="0 0 760 150" role="img" aria-label="The six-stage pipeline: Forecast, Truth, Diary, Learn, Correct, Show. A rain droplet of data travels along it.">
+      <!-- connecting line + arrows (static) -->
+      <path class="pipe-line" d="M40 75 H720"/>
+      <g class="pipe-arrow">
+        <!-- arrowheads between the 6 stages sit at the gaps; drawn as small triangles -->
+      </g>
+      <!-- 6 stages -->
+      <g id="stage-0">
+        <rect class="stage-box lit" x="10" y="48" width="110" height="54" rx="8"/>
+        <text class="stage-num" x="65" y="42">1</text>
+        <text class="stage-label" x="65" y="72">FORECAST</text>
+        <text class="stage-sub" x="65" y="90">Open-Meteo</text>
+      </g>
+      <g id="stage-1">
+        <rect class="stage-box" x="130" y="48" width="110" height="54" rx="8"/>
+        <text class="stage-num" x="185" y="42">2</text>
+        <text class="stage-label" x="185" y="72">TRUTH</text>
+        <text class="stage-sub" x="185" y="90">METAR</text>
+      </g>
+      <g id="stage-2">
+        <rect class="stage-box" x="250" y="48" width="110" height="54" rx="8"/>
+        <text class="stage-num" x="305" y="42">3</text>
+        <text class="stage-label" x="305" y="72">DIARY</text>
+        <text class="stage-sub" x="305" y="90">log.csv</text>
+      </g>
+      <g id="stage-3">
+        <rect class="stage-box" x="400" y="48" width="110" height="54" rx="8"/>
+        <text class="stage-num" x="455" y="42">4</text>
+        <text class="stage-label" x="455" y="72">LEARN</text>
+        <text class="stage-sub" x="455" y="90">train</text>
+      </g>
+      <g id="stage-4">
+        <rect class="stage-box" x="520" y="48" width="110" height="54" rx="8"/>
+        <text class="stage-num" x="575" y="42">5</text>
+        <text class="stage-label" x="575" y="72">CORRECT</text>
+        <text class="stage-sub" x="575" y="90">model.json</text>
+      </g>
+      <g id="stage-5">
+        <rect class="stage-box" x="640" y="48" width="110" height="54" rx="8"/>
+        <text class="stage-num" x="695" y="42">6</text>
+        <text class="stage-label" x="695" y="72">SHOW</text>
+        <text class="stage-sub" x="695" y="90">verdict</text>
+      </g>
+      <!-- small connecting arrows in the gaps -->
+      <g class="pipe-arrow">
+        <path d="M120 75 l8 0 M124 71 l6 4 -6 4" stroke="#5c6f6a" stroke-width="1.5" fill="none"/>
+        <path d="M240 75 l8 0 M244 71 l6 4 -6 4" stroke="#5c6f6a" stroke-width="1.5" fill="none"/>
+        <path d="M360 75 l38 0 M392 71 l6 4 -6 4" stroke="#5c6f6a" stroke-width="1.5" fill="none"/>
+        <path d="M510 75 l8 0 M514 71 l6 4 -6 4" stroke="#5c6f6a" stroke-width="1.5" fill="none"/>
+        <path d="M630 75 l8 0 M634 71 l6 4 -6 4" stroke="#5c6f6a" stroke-width="1.5" fill="none"/>
+      </g>
+      <!-- the travelling data packet: a rain droplet. Sits at stage 1 statically. -->
+      <g id="packet" transform="translate(65,75)">
+        <circle class="packet-glow" r="16"/>
+        <!-- droplet shape -->
+        <path class="packet" d="M0 -9 C5 -2 8 2 8 5 a8 8 0 0 1 -16 0 C-8 2 -5 -2 0 -9 Z"/>
+      </g>
+    </svg>
+    <p class="hero-cap">A single packet of data falls through six stages — forecast to verdict. (Animated; shows the full pipeline with motion off.)</p>
+  </div>
+
+  <h2>The big picture</h2>
+  <div class="flow"><span class="num">1.</span> FORECAST  ──►  <span class="num">2.</span> TRUTH  ──►  <span class="num">3.</span> DIARY  ──►  <span class="num">4.</span> LEARN  ──►  <span class="num">5.</span> CORRECT  ──►  <span class="num">6.</span> SHOW
+   Open-Meteo      METAR           log.csv         train          model.json       the webpage
+  (what models     (what really    (every          (find the      (tiny            (your 2-second
+   predict)         happened)       prediction      forecast’s     correction       rain verdict)
+                                    + outcome)      Mumbai bias)   numbers)
+
+   ⟲  A free hourly robot (GitHub Actions) repeats 1→2→3 forever, and re-runs 4→5 as the diary grows.
+       That’s the “self-improving” loop — it gets better every week, on its own, for $0.</div>
+
+  <h2>Module 1 — <code>pipeline/sources.py</code> · the forecast fetcher <span class="tag built">BUILT</span></h2>
+  <div class="analogy"><b>Like:</b> phoning the weather service and writing down what they predict.</div>
+  <p>Fetches the rain forecast for a Mumbai point from <b>Open-Meteo</b> (free, no signup). It grabs two models:
+  <code>best_match</code> (Open-Meteo’s tuned blend) and <code>ecmwf_ifs025</code> (Europe’s gold-standard model — our benchmark to beat).</p>
+  <p class="io"><b>In:</b> a latitude/longitude. &nbsp; <b>Out:</b> next 24 hours of predicted rain (mm) from each model.</p>
+  <p>It also has <code>fetch_recent_rain_mm()</code> — how much rain fell in the last 3 hours. That “what’s happening right now”
+  is the single strongest clue for the next 2 hours.</p>
+  <div class="micro" data-micro>
+    <span class="node">lat / lon</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node proc">sources.py</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node out">forecast mm</span>
+  </div>
+
+  <h2>Module 2 — <code>pipeline/labels.py</code> · the truth-checker <span class="tag built">BUILT</span></h2>
+  <div class="analogy"><b>Like:</b> a trustworthy person standing at the airport who tells you whether it’s <em>actually</em> raining.</div>
+  <p>Pulls <b>METAR</b> reports — real observations from Mumbai airport (VABB), filed every 30 minutes by trained observers,
+  free and no signup. It reads the weather code (<code>RA</code> = rain, <code>BR</code> = mist, etc.) and turns it into a simple
+  <b>yes/no: did it rain this hour?</b></p>
+  <p class="io"><b>In:</b> the airport code. &nbsp; <b>Out:</b> <code>{hour → raining true/false}</code>.</p>
+  <div class="analogy"><b>Why this matters most:</b> we check the forecast against a <em>real measurement</em>, not another forecast.
+  If we graded the forecast using another model’s guess, “we’re accurate” would be circular nonsense. METAR is the honest answer key.</div>
+  <div class="micro" data-micro>
+    <span class="node">METAR code (RA/BR)</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node proc">labels.py</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node out">rain yes / no</span>
+  </div>
+
+  <h2>Module 3 — <code>data/log.csv</code> · the diary (the database) <span class="tag built">BUILT</span></h2>
+  <div class="analogy"><b>Like:</b> a notebook with one line per hour: “forecast said X, reality was Y.”</div>
+  <p>A plain spreadsheet file. Each row = one prediction for one hour, plus what actually happened once it’s known.
+  Columns: when it was forecast, which hour, the two models’ predicted mm, recent rain, and <code>observed_raining</code> (the yes/no truth).</p>
+  <p>There’s no fancy database — <b>the file lives in Git</b>, which versions and stores it for free. Simple, free, and every row is the model’s study material.</p>
+  <div class="micro" data-micro>
+    <span class="node">forecast + outcome</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node proc">append row</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node out">log.csv (in Git)</span>
+  </div>
+
+  <h2>Module 4 — <code>pipeline/log_snapshot.py</code> · the diary-keeper (logger) <span class="tag built">BUILT</span></h2>
+  <div class="analogy"><b>Like:</b> the hand that writes in the diary every hour — adds today’s forecast, then fills in yesterday’s outcomes.</div>
+  <p>Ties Modules 1–3 together. Every time it runs it: (a) appends a fresh forecast snapshot (outcome still blank),
+  and (b) backfills the <code>raining</code> answer for past hours using METAR.</p>
+  <p class="io"><b>Run it:</b> <code>uv run python -m pipeline.log_snapshot</code>. &nbsp; First live run: 24 rows, 21 already answered.</p>
+  <div class="micro" data-micro>
+    <span class="node">sources + labels</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node proc">log_snapshot.py</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node out">new + backfilled rows</span>
+  </div>
+
+  <h2>Module 5 — <code>pipeline/train.py</code> · the student (the model) <span class="tag planned">NEXT</span></h2>
+  <div class="analogy"><b>Like:</b> reading the whole diary and learning the forecaster’s habits — “when they say 0mm at 4am but it rained, expect rain.”</div>
+  <p>Reads <code>log.csv</code> and trains a <b>tiny model</b> (a calibrated classifier) that takes the forecast + recent rain + hour-of-day
+  and outputs a corrected <b>probability of rain</b>. The goal: cut the forecast’s false alarms (today ~50% of rain predictions are wrong).</p>
+  <p>Crucially it has an <b>eval gate</b>: a new model is only kept if it beats the old one <em>and</em> the raw forecast on a fair test.
+  So it can only ever get better, never worse.</p>
+  <p class="io"><b>In:</b> the diary. &nbsp; <b>Out:</b> <code>model.json</code> — a handful of numbers.</p>
+  <div class="micro" data-micro>
+    <span class="node">log.csv (the diary)</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node proc">train.py + eval gate</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node out">rain probability</span>
+  </div>
+
+  <h2>Module 6 — <code>web/model.json</code> · the cheat-sheet <span class="tag planned">NEXT</span></h2>
+  <div class="analogy"><b>Like:</b> the forecaster’s habits written on a sticky note — a few numbers, not a brain.</div>
+  <p>The trained model exported as tiny weights (a few KB of JSON). The webpage applies it with plain arithmetic
+  (<code>corrected = w₁·forecast + w₂·recent_rain + …</code>) — <b>no AI engine running anywhere</b>, no server, no cost.</p>
+  <div class="micro" data-micro>
+    <span class="node">trained weights</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node proc">export</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node out">model.json (few KB)</span>
+  </div>
+
+  <h2>Module 7 — <code>web/</code> · the face (the webpage) <span class="tag built">BUILT (draft)</span></h2>
+  <div class="analogy"><b>Like:</b> the friendly front desk that just tells you the answer.</div>
+  <p>A static page that, in your browser, calls Open-Meteo live, applies <code>model.json</code>, and shows the 2-second verdict
+  (“Dry for 2 hours” / “Rain in ~40 min”). Files: <code>index.html</code>, <code>app.js</code>, <code>nowcast.js</code> (the verdict math),
+  <code>flood.js</code> (Mumbai flood-spot risk). Design spec: <code>docs/frontend-design-doc.html</code>.</p>
+  <p class="io">Hosted free on Cloudflare Pages. $0 because the browser does the work and the data API is free.</p>
+  <div class="micro" data-micro>
+    <span class="node">live forecast + model.json</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node proc">nowcast.js</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node out">2-second verdict</span>
+  </div>
+
+  <h2>Module 8 — GitHub Actions cron · the heartbeat <span class="tag planned">NEXT</span></h2>
+  <div class="analogy"><b>Like:</b> an alarm clock that wakes the diary-keeper every hour, forever, for free.</div>
+  <p>A scheduled job on GitHub that runs <code>log_snapshot.py</code> every hour and commits the new rows to <code>log.csv</code>,
+  then retrains daily. <b>This is what makes it “self-improving”</b> — it runs 24/7 with your computer off, at $0.
+  Without it, the diary only fills when you run it by hand.</p>
+  <div class="micro" data-micro>
+    <span class="node">clock: every hour</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node proc">GitHub Actions</span>
+    <span class="marrow"><svg viewBox="0 0 34 14"><path class="mtrack" d="M2 7 H32"/><polyline class="mtrack" points="27,3 32,7 27,11"/><circle class="mdot" cx="2" cy="7" r="3"/></svg></span>
+    <span class="node out">commit new rows</span>
+  </div>
+
+  <div class="diagram loop-fig" id="loopFig">
+    <svg viewBox="0 0 560 220" role="img" aria-label="The self-improving loop: an hourly heartbeat adds rows to the diary, and the model sharpens each cycle.">
+      <!-- left: heartbeat -->
+      <text class="loop-txt-strong" x="80" y="28">hourly cron</text>
+      <circle class="beat-pulse" id="beatPulse" cx="80" cy="110" r="20"/>
+      <circle class="beat-core" id="beatCore" cx="80" cy="110" r="16"/>
+      <text class="loop-txt" x="80" y="150">heartbeat · every hour</text>
+      <!-- the cycle ring in the middle -->
+      <g transform="translate(280,110)">
+        <circle class="loop-ring" id="loopRing" r="58" stroke-dasharray="350" stroke-dashoffset="0" transform="rotate(-90)"/>
+        <polygon class="loop-arrowhead" points="56,-10 66,0 56,10"/>
+        <text class="loop-txt-strong" x="0" y="-2" text-anchor="middle">⟲</text>
+        <text class="loop-txt" x="0" y="16" text-anchor="middle">1→2→3</text>
+      </g>
+      <text class="loop-txt" x="280" y="200">re-runs 4→5 as the diary grows</text>
+      <!-- right: diary rows accumulating + sharpening bars -->
+      <text class="loop-txt-strong" x="470" y="28">diary + model</text>
+      <g id="diaryRows">
+        <rect class="diary-row" x="420" y="44"  width="100" height="11" rx="2"/>
+        <rect class="diary-row" x="420" y="59"  width="100" height="11" rx="2"/>
+        <rect class="diary-row" x="420" y="74"  width="100" height="11" rx="2"/>
+        <rect class="diary-row" x="420" y="89"  width="100" height="11" rx="2"/>
+        <rect class="diary-row" x="420" y="104" width="100" height="11" rx="2"/>
+        <rect class="diary-row" x="420" y="119" width="100" height="11" rx="2"/>
+      </g>
+      <!-- sharpening: bars that grow toward "sharper" -->
+      <g id="sharpBars">
+        <rect class="sharp-bar" x="420" y="170" width="14" height="10"/>
+        <rect class="sharp-bar" x="440" y="165" width="14" height="15"/>
+        <rect class="sharp-bar" x="460" y="158" width="14" height="22"/>
+        <rect class="sharp-bar" x="480" y="150" width="14" height="30"/>
+        <rect class="sharp-bar" x="500" y="142" width="14" height="38"/>
+      </g>
+      <text class="loop-txt" x="470" y="198">model sharpens →</text>
+    </svg>
+    <p class="hero-cap">Each beat: a new diary row, the cycle turns, the model gets a little sharper. (Animated; static frame shown with motion off.)</p>
+  </div>
+
+  <h2>How a single rain verdict happens (end to end)</h2>
+  <ul>
+    <li>You open the page → it asks Open-Meteo for the next 2 hours of rain at your spot.</li>
+    <li><code>nowcast.js</code> applies <code>model.json</code> to <em>correct</em> that forecast for Mumbai.</li>
+    <li>It shows the verdict and (if relevant) a flood-spot warning.</li>
+    <li>Meanwhile, in the background, the cron has been logging forecasts vs reality and improving <code>model.json</code> — so next week’s answer is sharper.</li>
+  </ul>
+
+  <div class="seq" id="seqFig">
+    <svg viewBox="0 0 720 130" role="img" aria-label="One verdict: the browser asks Open-Meteo, applies model.json, and shows the verdict.">
+      <path class="seq-flow" d="M95 55 H625"/>
+      <g id="seq-0">
+        <rect class="seq-box lit" x="20" y="34" width="150" height="42" rx="8"/>
+        <text class="seq-label" x="95" y="52">BROWSER</text>
+        <text class="seq-sub" x="95" y="67">you open the page</text>
+      </g>
+      <g id="seq-1">
+        <rect class="seq-box" x="200" y="34" width="150" height="42" rx="8"/>
+        <text class="seq-label" x="275" y="52">OPEN-METEO</text>
+        <text class="seq-sub" x="275" y="67">next 2h of rain</text>
+      </g>
+      <g id="seq-2">
+        <rect class="seq-box" x="380" y="34" width="150" height="42" rx="8"/>
+        <text class="seq-label" x="455" y="52">model.json</text>
+        <text class="seq-sub" x="455" y="67">correct for Mumbai</text>
+      </g>
+      <g id="seq-3">
+        <rect class="seq-box" x="560" y="34" width="140" height="42" rx="8"/>
+        <text class="seq-label" x="630" y="52">VERDICT</text>
+        <text class="seq-sub" x="630" y="67">show + flood risk</text>
+      </g>
+      <text class="seq-verdict" id="seqVerdict" x="360" y="112">“Dry for 2 hours”</text>
+      <!-- token sits at the browser statically -->
+      <circle class="seq-token" id="seqToken" cx="95" cy="55" r="6"/>
+    </svg>
+    <p class="hero-cap">One verdict, start to finish — browser → Open-Meteo → apply model.json → answer. (Animated; static frame shown with motion off.)</p>
+  </div>
+
+  <h2>Where we are right now</h2>
+  <table>
+    <tr><th>Module</th><th>Status</th></tr>
+    <tr><td>1 · sources.py (forecast)</td><td><span class="tag built">BUILT</span></td></tr>
+    <tr><td>2 · labels.py (METAR truth)</td><td><span class="tag built">BUILT</span></td></tr>
+    <tr><td>3 · log.csv (diary)</td><td><span class="tag built">BUILT</span></td></tr>
+    <tr><td>4 · log_snapshot.py (logger)</td><td><span class="tag built">BUILT</span></td></tr>
+    <tr><td>7 · web/ frontend</td><td><span class="tag built">BUILT (draft)</span></td></tr>
+    <tr><td>8 · GitHub cron (heartbeat)</td><td><span class="tag planned">NEXT — starts data collecting 24/7</span></td></tr>
+    <tr><td>5 · train.py (the model)</td><td><span class="tag planned">after ~weeks of data</span></td></tr>
+    <tr><td>6 · model.json (cheat-sheet)</td><td><span class="tag planned">output of training</span></td></tr>
+  </table>
+  <p><b>The next step</b> is Module 8 (the hourly cron) — because nothing improves until the diary is filling itself
+  automatically. Everything else is ready and waiting on data.</p>
+
+  <footer>Mumbai Rain · how-it-works explainer · the goal: a fast, honest, free rain verdict for Mumbai that learns.</footer>
+</div>
+
+<!-- anime.js is OPTIONAL. The whole document reads and every diagram shows a
+     sensible static frame without it. The script below only ADDS motion, and
+     bails out entirely on reduced-motion or if anime.js failed to load. -->
+<script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var anime = window.anime;
+  // No motion if the user asked for less, or the library didn't load.
+  if (reduce || typeof anime !== "function") return;
+
+  function $(sel, root){ return (root||document).querySelector(sel); }
+  function $all(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
+
+  /* ---- 1. Hero pipeline: a droplet hops stage to stage, lighting each ---- */
+  (function heroPipe(){
+    var fig = $("#heroPipe"); if (!fig) return;
+    var packet = $("#packet", fig);
+    // x-centres of the 6 stage boxes (viewBox coords)
+    var xs = [65,185,305,455,575,695];
+    var stages = xs.map(function(_,i){ return $("#stage-"+i, fig); });
+    function lit(i){ stages.forEach(function(s,j){ if(s) s.querySelector("rect").classList.toggle("lit", j===i); }); }
+    var tl = anime.timeline({ loop:true, easing:"easeInOutQuad" });
+    xs.forEach(function(x,i){
+      tl.add({
+        targets: packet,
+        // translate within the SVG group: packet baseline is translate(65,75)
+        // so move relative to 0 by (x-65)
+        translateX: x - 65,
+        duration: 520,
+        begin: function(){ lit(i); },
+      });
+      // little "land" pulse at each stage
+      tl.add({
+        targets: packet.querySelector(".packet-glow"),
+        r: [16, 22, 16],
+        opacity: [0.35, 0.6, 0.35],
+        duration: 360,
+        easing: "easeOutQuad"
+      }, "-=120");
+    });
+    // reset back to stage 1 smoothly at loop end
+    tl.add({ targets: packet, translateX: 0, duration: 1, begin:function(){ lit(0); } });
+  })();
+
+  /* ---- 2. Self-improving loop: heartbeat, turning ring, rows, sharpening ---- */
+  (function loop(){
+    var fig = $("#loopFig"); if (!fig) return;
+    // heartbeat pulse (continuous)
+    anime({
+      targets: $("#beatCore", fig),
+      scale: [1, 1.18, 1],
+      duration: 1100, loop:true, easing:"easeInOutSine"
+    });
+    anime({
+      targets: $("#beatPulse", fig),
+      r: [16, 30], opacity:[0.5, 0],
+      duration: 1100, loop:true, easing:"easeOutQuad"
+    });
+    // ring sweeps round
+    anime({
+      targets: $("#loopRing", fig),
+      strokeDashoffset: [0, -350],
+      duration: 2200, loop:true, easing:"linear"
+    });
+    // diary rows fill one by one, then reset
+    var rows = $all("#diaryRows rect", fig);
+    var bars = $all("#sharpBars rect", fig);
+    var origH = bars.map(function(b){ return parseFloat(b.getAttribute("height")); });
+    var origY = bars.map(function(b){ return parseFloat(b.getAttribute("y")); });
+    function cycle(){
+      rows.forEach(function(r){ r.classList.remove("filled"); });
+      // fill rows one by one
+      var t = anime.timeline({ easing:"easeOutQuad" });
+      rows.forEach(function(r,i){
+        t.add({ targets:r, opacity:[0.55,1], duration:200,
+                begin:function(){ r.classList.add("filled"); } }, i*280);
+      });
+      // bars sharpen (grow a touch) as data accumulates
+      bars.forEach(function(b,i){
+        anime({ targets:b, height:[origH[i], origH[i]+6, origH[i]],
+                duration:2000, easing:"easeInOutSine",
+                update:function(a){ b.setAttribute("y", origY[i] - (parseFloat(b.getAttribute("height"))-origH[i])); }
+              });
+      });
+    }
+    cycle();
+    setInterval(cycle, 2200);
+  })();
+
+  /* ---- 3. Per-module micro diagrams: dot travels in→out on scroll ---- */
+  (function micros(){
+    var blocks = $all(".micro[data-micro]");
+    if (!blocks.length) return;
+    function run(block){
+      $all(".mdot", block).forEach(function(dot){
+        anime({ targets:dot, cx:[2,32], opacity:[0.9,0.9,0],
+                duration:900, loop:true, easing:"easeInOutQuad",
+                delay: Math.random()*400 });
+      });
+    }
+    if (!("IntersectionObserver" in window)){ blocks.forEach(run); return; }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting && !e.target._anim){ e.target._anim = true; run(e.target); }
+      });
+    }, { threshold:0.35 });
+    blocks.forEach(function(b){ io.observe(b); });
+  })();
+
+  /* ---- 4. End-to-end verdict sequence: token flows, stages light, verdict pops ---- */
+  (function seq(){
+    var fig = $("#seqFig"); if (!fig) return;
+    var token = $("#seqToken", fig);
+    var verdict = $("#seqVerdict", fig);
+    var xs = [95, 275, 455, 630];
+    var boxes = ["#seq-0","#seq-1","#seq-2","#seq-3"].map(function(id){ return $(id, fig); });
+    function lit(i){ boxes.forEach(function(b,j){ if(b) b.querySelector("rect").classList.toggle("lit", j===i); }); }
+    var tl = anime.timeline({ loop:true, easing:"easeInOutQuad" });
+    xs.forEach(function(x,i){
+      tl.add({ targets:token, cx:x, duration:560, begin:function(){ lit(i); } });
+    });
+    tl.add({ targets:verdict, opacity:[0.35,1], duration:600, easing:"easeOutQuad" });
+    tl.add({ targets:token, opacity:[1,0], duration:300 });
+    tl.add({ targets:token, cx:95, opacity:[0,1], duration:1, begin:function(){ lit(0); } });
+    // hold a beat before looping
+    tl.add({ targets:verdict, opacity:[1,1], duration:1100 });
+  })();
+
+})();
+</script>
+</body>
+</html>

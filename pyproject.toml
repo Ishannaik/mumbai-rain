@@ -1,0 +1,12 @@
+[project]
+name = "mumbai-rain"
+version = "0.1.0"
+description = "Hyperlocal Mumbai 0-2h rain nowcaster: calibrated bias-correction of free global forecasts."
+requires-python = ">=3.11"
+dependencies = ["requests>=2.31", "scikit-learn>=1.4", "numpy>=1.26"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

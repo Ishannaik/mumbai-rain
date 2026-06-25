@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mumbai Rain — Design Spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@500;800&family=Mukta:wght@600&family=Spline+Sans+Mono:wght@400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sky-deep:#0d1b1e; --sky-raised:#14282b; --mist:#dce6e3; --wet-stone:#6b8385;
+    --clear:#a9c4bf; --rain:#4ea8d6; --heavy:#ff8c2a; --flood:#e23b3b;
+    --hair:rgba(108,131,133,.25);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--sky-deep);color:var(--mist);font-family:Inter,system-ui,sans-serif;
+       line-height:1.5;padding:48px 24px 80px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto}
+  .eyebrow{font-family:Mukta,sans-serif;font-size:1.3rem;color:var(--rain);letter-spacing:.02em}
+  h1{font-family:Saira;font-weight:800;font-size:clamp(2rem,6vw,3.2rem);letter-spacing:-.01em;margin:.1em 0 .2em}
+  .dirline{color:var(--wet-stone);max-width:60ch;font-size:1.05rem}
+  h2{font-family:Saira;font-weight:800;font-size:1rem;letter-spacing:.18em;text-transform:uppercase;
+     color:var(--wet-stone);margin:64px 0 20px;padding-bottom:10px;border-bottom:1px solid var(--hair)}
+  .lbl{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--wet-stone)}
+  .mono{font-family:'Spline Sans Mono',monospace}
+
+  /* ---- phone mockups ---- */
+  .phones{display:flex;gap:24px;flex-wrap:wrap}
+  .phone{position:relative;width:300px;height:600px;border-radius:34px;overflow:hidden;
+         background:var(--sky-deep);border:1px solid var(--hair);box-shadow:0 24px 60px rgba(0,0,0,.5);
+         display:flex;flex-direction:column;padding:26px 22px}
+  .ptop{display:flex;justify-content:space-between;align-items:center}
+  .ptop .pa{font-family:Mukta;color:var(--rain);font-size:1.05rem}
+  .pill{font-size:.8rem;color:var(--mist);border:1px solid var(--hair);border-radius:999px;padding:5px 12px}
+  .hero{flex:1;display:flex;flex-direction:column;justify-content:center}
+  .verdict{font-family:Saira;font-weight:800;font-size:2.7rem;line-height:.98;letter-spacing:-.01em}
+  .sub{font-family:'Spline Sans Mono',monospace;font-size:1.05rem;margin-top:8px;color:var(--mist);opacity:.85}
+  .leave{margin-top:18px;font-size:.95rem;font-weight:500}
+  .rows{border-top:1px solid var(--hair);padding-top:14px}
+  .row{display:flex;justify-content:space-between;font-size:.8rem;color:var(--wet-stone);padding:5px 0}
+  .row .mono{color:var(--mist)}
+  .flood-row{color:var(--flood);font-weight:500}
+  .foot{margin-top:14px;font-size:.62rem;color:var(--wet-stone);letter-spacing:.04em}
+  .foot a{color:var(--wet-stone)}
+  /* rising water signature */
+  .water{position:absolute;left:0;right:0;bottom:0;pointer-events:none}
+  .water::before{content:"";position:absolute;left:0;right:0;bottom:0;height:100%;
+     background:linear-gradient(180deg,transparent,rgba(78,168,214,.18))}
+  .state-dry .verdict{color:var(--clear)} .state-dry .water{height:6px;background:rgba(169,196,191,.3)}
+  .state-rain .verdict{color:var(--rain)} .state-rain .water{height:90px;background:linear-gradient(180deg,rgba(78,168,214,.05),rgba(78,168,214,.28))}
+  .state-flood .verdict{color:var(--heavy)} .state-flood .water{height:190px;background:linear-gradient(180deg,rgba(226,59,59,.04),rgba(226,59,59,.32))}
+  .cap{font-size:.8rem;color:var(--wet-stone);margin-top:10px;text-align:center;width:300px}
+
+  /* ---- swatches ---- */
+  .grid{display:flex;gap:14px;flex-wrap:wrap}
+  .sw{width:150px}
+  .chip{height:72px;border-radius:10px;border:1px solid var(--hair)}
+  .sw .nm{font-size:.8rem;margin-top:8px}
+  .sw .hex{font-family:'Spline Sans Mono',monospace;font-size:.78rem;color:var(--wet-stone)}
+
+  /* ---- type specimen ---- */
+  .spec-row{padding:16px 0;border-bottom:1px solid var(--hair)}
+  .specimen{line-height:1}
+  .s-disp{font-family:Saira;font-weight:800;font-size:3rem;color:var(--mist)}
+  .s-dev{font-family:Mukta;font-weight:600;font-size:2.4rem;color:var(--rain)}
+  .s-mono{font-family:'Spline Sans Mono',monospace;font-size:1.4rem;color:var(--clear)}
+  .note{color:var(--wet-stone);font-size:.85rem;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">पाऊस</div>
+  <h1>Mumbai Rain — Design Spec</h1>
+  <p class="dirline">Mumbai's monsoon sky + the meteorologist's radar scale + rising flood-water. The screen reads like a rain radar tuned to your street. The verdict's colour <em>is</em> the live rain reading.</p>
+
+  <h2>The verdict, in three states</h2>
+  <div class="phones">
+
+    <div>
+      <div class="phone state-dry">
+        <div class="ptop"><span class="pa">पाऊस</span><span class="pill">📍 Bandra ▾</span></div>
+        <div class="hero">
+          <div class="verdict">DRY FOR<br>2 HOURS</div>
+          <div class="sub">clear · ☀</div>
+        </div>
+        <div class="rows">
+          <div class="row"><span>measured now</span><span class="mono">0.0 mm · 2 km</span></div>
+          <div class="foot">calibrated for your spot · v1 · <a href="#">Weather data by Open-Meteo.com</a></div>
+        </div>
+        <div class="water"></div>
+      </div>
+      <div class="cap">DRY — sea-glass calm, water a thin line at the base</div>
+    </div>
+
+    <div>
+      <div class="phone state-rain">
+        <div class="ptop"><span class="pa">पाऊस</span><span class="pill">📍 Andheri ▾</span></div>
+        <div class="hero">
+          <div class="verdict">RAIN IN<br>~40 MIN</div>
+          <div class="sub">~3 mm/h</div>
+          <div class="leave" style="color:var(--rain)">▸ Leave in the next 15 min to stay dry</div>
+        </div>
+        <div class="rows">
+          <div class="row"><span>measured now</span><span class="mono">0.2 mm · 3 km</span></div>
+          <div class="foot">calibrated for your spot · v1 · <a href="#">Weather data by Open-Meteo.com</a></div>
+        </div>
+        <div class="water"></div>
+      </div>
+      <div class="cap">RAIN COMING — radar blue, water climbing</div>
+    </div>
+
+    <div>
+      <div class="phone state-flood">
+        <div class="ptop"><span class="pa">पाऊस</span><span class="pill">📍 Hindmata ▾</span></div>
+        <div class="hero">
+          <div class="verdict">RAINING<br>NOW</div>
+          <div class="sub">~9 mm/h</div>
+        </div>
+        <div class="rows">
+          <div class="row"><span>measured now</span><span class="mono">8.5 mm · 1 km</span></div>
+          <div class="row flood-row"><span>⚠ flood risk</span><span>Hindmata pooling likely</span></div>
+          <div class="foot">calibrated for your spot · v1 · <a href="#">Weather data by Open-Meteo.com</a></div>
+        </div>
+        <div class="water"></div>
+      </div>
+      <div class="cap">FLOOD RISK — radar red, water visibly risen</div>
+    </div>
+
+  </div>
+
+  <h2>Colour — from the storm sky & the radar scale</h2>
+  <p class="lbl" style="margin-bottom:12px">Surfaces (always on)</p>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#0d1b1e"></div><div class="nm">sky-deep</div><div class="hex">#0d1b1e</div></div>
+    <div class="sw"><div class="chip" style="background:#14282b"></div><div class="nm">sky-raised</div><div class="hex">#14282b</div></div>
+    <div class="sw"><div class="chip" style="background:#dce6e3"></div><div class="nm">mist (text)</div><div class="hex">#dce6e3</div></div>
+    <div class="sw"><div class="chip" style="background:#6b8385"></div><div class="nm">wet-stone</div><div class="hex">#6b8385</div></div>
+  </div>
+  <p class="lbl" style="margin:22px 0 12px">Verdict accent — the live radar reading (one at a time)</p>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#a9c4bf"></div><div class="nm">clear / dry</div><div class="hex">#a9c4bf</div></div>
+    <div class="sw"><div class="chip" style="background:#4ea8d6"></div><div class="nm">rain coming</div><div class="hex">#4ea8d6</div></div>
+    <div class="sw"><div class="chip" style="background:#ff8c2a"></div><div class="nm">raining now</div><div class="hex">#ffd23f→#ff8c2a</div></div>
+    <div class="sw"><div class="chip" style="background:#e23b3b"></div><div class="nm">flood (reserved)</div><div class="hex">#e23b3b</div></div>
+  </div>
+
+  <h2>Type — a station board + a Marathi anchor</h2>
+  <div class="spec-row"><div class="specimen s-disp">RAIN IN ~40 MIN</div><div class="note">Display — Saira Condensed 800. The verdict. Reads like a Mumbai local-train indicator board.</div></div>
+  <div class="spec-row"><div class="specimen s-dev">पाऊस</div><div class="note">Eyebrow — Mukta (Devanagari). "Rain" in Marathi. Grounds it in Mumbai, not a generic city.</div></div>
+  <div class="spec-row"><div class="specimen s-mono">8.5 mm · 1 km · v1</div><div class="note">Data — Spline Sans Mono. Station readings & versions. Instrument/readout feel.</div></div>
+  <div class="spec-row"><div class="specimen" style="font-family:Inter;font-size:1.1rem;color:var(--mist)">Leave in the next 15 minutes to stay dry.</div><div class="note">Body — Inter / system-ui. Quiet, legible, gets out of the way.</div></div>
+
+  <h2>Signature — "the rising water"</h2>
+  <p class="dirline">A waterline anchored to the bottom of the screen that physically <strong>rises as flood risk grows</strong> (see the three phones above: thin line → climbing → risen + red). It visualises Mumbai's real fear — water rising in the street when rain meets tide — instead of the generic falling-rain every weather app uses. It's the one bold element; everything else stays quiet. Motion: slow ambient swell only; <span class="mono">prefers-reduced-motion</span> → one static line.</p>
+
+</div>
+</body>
+</html>

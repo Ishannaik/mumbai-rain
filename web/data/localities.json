@@ -1,0 +1,17 @@
+[
+  {"name": "Andheri", "lat": 19.1197, "lon": 72.8468},
+  {"name": "Bandra", "lat": 19.0596, "lon": 72.8295},
+  {"name": "Borivali", "lat": 19.2290, "lon": 72.8567},
+  {"name": "Chembur", "lat": 19.0626, "lon": 72.8990},
+  {"name": "Colaba", "lat": 18.9067, "lon": 72.8147},
+  {"name": "Dadar", "lat": 19.0176, "lon": 72.8430},
+  {"name": "Ghatkopar", "lat": 19.0863, "lon": 72.9081},
+  {"name": "Goregaon", "lat": 19.1646, "lon": 72.8493},
+  {"name": "Kurla", "lat": 19.0726, "lon": 72.8845},
+  {"name": "Malad", "lat": 19.1860, "lon": 72.8480},
+  {"name": "Powai", "lat": 19.1176, "lon": 72.9060},
+  {"name": "Sion", "lat": 19.0410, "lon": 72.8620},
+  {"name": "Thane", "lat": 19.2183, "lon": 72.9781},
+  {"name": "Vile Parle", "lat": 19.0990, "lon": 72.8460},
+  {"name": "Worli", "lat": 19.0176, "lon": 72.8170}
+]

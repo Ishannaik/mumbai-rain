@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# uv
+.uv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# NOTE: data/log.csv is NOT ignored — it's the training database, committed by the cron.

@@ -1,0 +1,181 @@
+/* Mumbai Rain — wet-tar palette, sodium-lamp accent, departure-board verdict.
+   Mobile-first, single screen, no framework. */
+
+:root {
+  /* Palette (named): warm not weather-blue. */
+  --ink:      #14110f;   /* wet tar at night — the field */
+  --ink-2:    #1d1916;   /* raised surface (rows) */
+  --hair:     #2c2622;   /* hairline dividers */
+  --paper:    #f2e9dc;   /* warm wet-newsprint — primary text */
+  --muted:    #9a8f82;   /* damp grey — labels, meta */
+  --sodium:   #f2a65a;   /* Mumbai streetlamp amber — DRY / safe */
+  --monsoon:  #7fb8c4;   /* rain-glass cyan-grey — RAIN incoming */
+  --storm:    #b8c4c2;   /* heavy-sheet near-white — raining now */
+  --alert:    #e2533b;   /* flood-warning vermilion — used only when flooding */
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden; /* single screen; rain canvas owns the bleed */
+}
+
+/* Rain falls behind the content; subtle radial sodium glow up from the floor. */
+#rain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(120% 80% at 50% 118%, rgba(242,166,90,0.10), transparent 60%),
+    var(--ink);
+}
+
+main {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: min(94vw, 460px);
+  margin: 0 auto;
+  padding: max(22px, env(safe-area-inset-top)) 22px max(22px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ---- Location ---- */
+.loc { display: flex; flex-direction: column; gap: 6px; }
+.loc-eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.loc-pill {
+  position: relative;
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  padding: 2px 4px 2px 14px;
+  background: var(--ink-2);
+}
+/* The pill carries a downward chevron so the select reads as tappable. */
+.loc-pill::after {
+  content: "▾";
+  color: var(--sodium);
+  font-size: 0.8rem;
+  padding: 0 10px 0 4px;
+  pointer-events: none;
+}
+#locality {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--paper);
+  font: 700 1.05rem/1 system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  padding: 8px 2px 8px 0;
+  cursor: pointer;
+}
+#locality:focus-visible { outline: 2px solid var(--sodium); outline-offset: 4px; border-radius: 6px; }
+
+/* ---- Hero verdict — the 2-second answer ---- */
+.hero {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+.verdict {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-weight: 800;
+  font-stretch: 125%;              /* wide, billboard-like */
+  font-size: clamp(2.6rem, 13vw, 4.4rem);
+  line-height: 0.96;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+  color: var(--paper);
+}
+.verdict-sub {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: clamp(1.1rem, 5.5vw, 1.6rem);
+  margin: 14px 0 0;
+  color: var(--muted);
+}
+
+/* State accents recolour the headline so the verdict *is* the weather. */
+.state-dry .verdict      { color: var(--sodium); }
+.state-incoming .verdict { color: var(--monsoon); }
+.state-now .verdict      { color: var(--storm); }
+.state-error .verdict    { color: var(--alert); }
+
+/* ---- Leave-now strip ---- */
+.leave {
+  margin: 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--sodium);
+  background: rgba(242,166,90,0.10);
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--sodium);
+}
+.leave[hidden] { display: none; }
+
+/* ---- Detail rows ---- */
+.details { margin: 0; }
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--hair);
+}
+.row[hidden] { display: none; }
+.row dt {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+#flood.high  { color: var(--alert); font-weight: 600; }
+#flood.watch { color: var(--sodium); }
+
+/* ---- Footer ---- */
+.foot { margin-top: 2px; }
+.honesty { margin: 0 0 4px; color: var(--muted); font-size: 0.8rem; }
+.attrib { margin: 0; font-size: 0.78rem; }
+.attrib a { color: var(--monsoon); text-decoration: none; }
+.attrib a:hover, .attrib a:focus-visible { text-decoration: underline; }
+
+/* ---- Loading shimmer on the verdict ---- */
+.state-loading .verdict {
+  color: var(--muted);
+  opacity: 0.55;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: 0.85; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .state-loading .verdict { animation: none; }
+}

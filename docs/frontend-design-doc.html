@@ -1,0 +1,1375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>पाऊस — The Mumbai Monsoon Almanac · Frontend Design Doc</title>
+<meta name="theme-color" content="#dde2dc">
+<meta name="color-scheme" content="light only">
+<meta name="darkreader-lock">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,600;9..144,0,900;9..144,1,600&family=Newsreader:ital,opsz@0,18;1,18&family=IBM+Plex+Mono:wght@400;500;600&family=Tiro+Devanagari+Marathi:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* --- paper & ink (the almanac, near-monochrome) --- */
+    --paper:#dde2dc;        /* wet newsprint — cool grey-green, NOT cream */
+    --paper-2:#d3d9d2;      /* plate / card surface, a half-tone deeper */
+    --paper-3:#c7cec6;      /* deepest tint, table headers, wells */
+    --ink:#16221f;          /* storm ink — display + body text + the 2px rule */
+    --ink-soft:#4a5853;     /* wet stone — captions, mono labels, secondary */
+    --rule:#a9b3ac;         /* hairline ink */
+    --rule-soft:#bdc5be;
+    /* --- radar reflectivity as DATA-INK ONLY (one hue at a time) --- */
+    --radar-dry:#5a8f86;    /* sea-glass — dry / off-ramp */
+    --radar-rain:#2f7db0;   /* radar blue — rain incoming (most-shown state) */
+    --radar-now:#d98a2b;    /* amber — raining now (bridge band) */
+    --radar-flood:#c0392b;  /* flood red — reserved, flood-watch only */
+    --storm-gold:#e8b25a;   /* the single 'storm light' glint — flood gauge only */
+    /* --- rhythm --- */
+    --s-3:12px; --s-4:16px; --s-5:24px; --s-6:34px; --s-7:52px; --s-8:72px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%;color-scheme:only light;background:var(--paper)}
+  html:focus-within{scroll-behavior:smooth}
+  body{
+    background:var(--paper);color:var(--ink);color-scheme:only light;
+    font-family:'Newsreader',Georgia,serif;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* faint letterpress tooth on the paper (decorative, behind everything, never hides content) */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+    background:
+      radial-gradient(120% 70% at 88% -8%, rgba(22,34,31,.05), transparent 60%),
+      radial-gradient(100% 60% at -6% 108%, rgba(22,34,31,.04), transparent 60%);
+  }
+
+  /* ================= layout shell ================= */
+  .wrap{max-width:1180px;margin:0 auto;padding:clamp(24px,4vw,44px) clamp(18px,4vw,40px) 96px}
+
+  /* ---- masthead ---- */
+  .masthead{
+    display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;
+    border-bottom:2px solid var(--ink);padding-bottom:12px;
+  }
+  .anchor{font-family:'Tiro Devanagari Marathi',serif;font-size:clamp(2.6rem,10vw,4.4rem);line-height:.86;color:var(--ink)}
+  .mast-meta{
+    font-family:'IBM Plex Mono',monospace;font-size:.7rem;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--ink-soft);text-align:right;line-height:1.85
+  }
+  .mast-meta b{color:var(--ink);font-weight:600}
+
+  /* ---- hero (the thesis) ---- */
+  .hero{padding:var(--s-7) 0 var(--s-6);border-bottom:1px solid var(--rule)}
+  .dateline{font-family:'IBM Plex Mono',monospace;font-size:.74rem;letter-spacing:.18em;
+            text-transform:uppercase;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .headline{
+    font-family:'Fraunces',serif;font-weight:900;font-variation-settings:"opsz" 144;
+    font-size:clamp(2.4rem,8.5vw,5.4rem);line-height:.95;letter-spacing:-.02em;
+    max-width:18ch;margin:.16em 0 .28em
+  }
+  .headline em{font-style:italic;font-weight:600;color:var(--radar-rain)}
+  .standfirst{font-family:'Newsreader',serif;font-style:italic;
+              font-size:clamp(1.08rem,3.2vw,1.5rem);color:var(--ink-soft);max-width:48ch}
+  .standfirst b{color:var(--ink);font-style:normal;font-weight:400}
+  .dropline{
+    font-family:'IBM Plex Mono',monospace;font-size:.8rem;margin-top:var(--s-4);
+    display:inline-flex;align-items:center;gap:11px;color:var(--ink-soft);
+    font-variant-numeric:tabular-nums;letter-spacing:.01em
+  }
+  .dropline .dot{width:9px;height:9px;border-radius:50%;background:var(--radar-rain);
+                 box-shadow:0 0 0 4px rgba(47,125,176,.16);flex:none}
+  .dropline b{color:var(--ink);font-weight:500}
+
+  /* ================= plates (numbered figure sections) ================= */
+  .plate-sec{margin-top:var(--s-8);scroll-margin-top:18px}
+  .plate-head{
+    display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;
+    border-bottom:1px solid var(--ink);padding-bottom:9px;margin-bottom:var(--s-5)
+  }
+  .plate-no{font-family:'IBM Plex Mono',monospace;font-size:.74rem;color:var(--ink-soft);
+            letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+  .plate-title{font-family:'Fraunces',serif;font-weight:600;font-variation-settings:"opsz" 40;
+               font-size:clamp(1.35rem,3.4vw,1.85rem);letter-spacing:-.01em;color:var(--ink)}
+  .plate-margin{margin-left:auto;font-family:'Newsreader',serif;font-style:italic;
+                font-size:.96rem;color:var(--ink-soft);max-width:34ch;text-align:right}
+
+  /* prose */
+  p{margin:0 0 var(--s-4);max-width:74ch}
+  .lead{font-family:'Newsreader',serif;font-style:italic;font-size:1.12rem;color:var(--ink);max-width:70ch}
+  h3{font-family:'Fraunces',serif;font-weight:600;font-variation-settings:"opsz" 30;
+     font-size:1.12rem;letter-spacing:-.005em;color:var(--ink);margin:var(--s-6) 0 var(--s-3)}
+  h3 .h3-no{font-family:'IBM Plex Mono',monospace;font-size:.8rem;color:var(--ink-soft);
+            font-weight:500;margin-right:.5em}
+  ul,ol.body{margin:0 0 var(--s-4) 1.25em;max-width:74ch}
+  li{margin:.32em 0}
+  strong{color:var(--ink);font-weight:600}
+  em{color:var(--ink);font-style:italic}
+  a{color:var(--radar-rain);text-decoration-thickness:1px;text-underline-offset:2px}
+  a:hover,a:focus-visible{color:var(--ink)}
+  code,.mono{font-family:'IBM Plex Mono',monospace;font-size:.84em;font-variant-numeric:tabular-nums}
+  code{background:var(--paper-3);padding:.08em .42em;border-radius:3px;color:var(--ink)}
+  .lbl{font-family:'IBM Plex Mono',monospace;font-size:.7rem;letter-spacing:.16em;
+       text-transform:uppercase;color:var(--ink-soft)}
+
+  /* margin-note callout (almanac aside) */
+  .note{
+    border-left:2px solid var(--ink);background:var(--paper-2);
+    padding:var(--s-4) var(--s-5);margin:var(--s-4) 0;max-width:74ch;
+    font-family:'Newsreader',serif
+  }
+  .note .note-k{font-family:'IBM Plex Mono',monospace;font-size:.66rem;letter-spacing:.14em;
+                text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:4px}
+  .note.flood{border-left-color:var(--radar-flood)}
+  .note.flood .note-k{color:var(--radar-flood)}
+
+  /* prominent ACTION line (solid colour, never background-clip) */
+  .action{
+    display:flex;align-items:baseline;gap:.6em;margin:var(--s-4) 0;max-width:60ch;
+    font-family:'Newsreader',serif;font-style:italic;font-size:1.15rem;color:var(--ink);
+    padding:12px 0 12px 16px;border-left:3px solid var(--radar-rain)
+  }
+  .action .mk{font-family:'IBM Plex Mono',monospace;font-style:normal;font-weight:600;
+              color:var(--radar-rain);font-size:.95em;flex:none}
+
+  /* ================= tables ================= */
+  .tbl-wrap{overflow-x:auto;margin:var(--s-4) 0;border:1px solid var(--rule)}
+  table{border-collapse:collapse;width:100%;font-size:.88rem;background:var(--paper-2)}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+  th{font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:.66rem;letter-spacing:.1em;
+     text-transform:uppercase;color:var(--ink-soft);background:var(--paper-3)}
+  td{font-family:'Newsreader',serif}
+  tr:last-child td{border-bottom:none}
+  td .mono,td code{white-space:nowrap}
+  td.num,.num-col{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+  .swatch-cell{display:flex;align-items:center;gap:10px}
+  .swatch-cell .chip{width:24px;height:24px;border:1px solid var(--ink);flex:none}
+
+  /* ================= engraved swatch grid (Plate colour system) ================= */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin:var(--s-4) 0}
+  .sw{border:1px solid var(--rule);background:var(--paper-2)}
+  .sw .chip{height:64px;border-bottom:1px solid var(--ink);position:relative;cursor:pointer}
+  .sw .chip:focus-visible{outline:2px solid var(--ink);outline-offset:-4px}
+  .sw .chip .dbz{position:absolute;right:8px;bottom:6px;font-family:'IBM Plex Mono',monospace;
+                 font-size:.62rem;letter-spacing:.04em;color:rgba(255,255,255,.92);
+                 text-shadow:0 1px 2px rgba(0,0,0,.4);font-variant-numeric:tabular-nums}
+  .sw .meta{padding:9px 11px 11px}
+  .sw .nm{font-family:'Fraunces',serif;font-weight:600;font-size:.95rem;color:var(--ink);line-height:1.1}
+  .sw .hex{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--ink-soft);margin-top:3px}
+  .sw .desc{font-family:'Newsreader',serif;font-style:italic;font-size:.84rem;color:var(--ink-soft);margin-top:6px;line-height:1.35}
+
+  /* ================= type specimens ================= */
+  .spec-row{padding:18px 0;border-bottom:1px solid var(--rule-soft);display:grid;gap:7px}
+  .spec-row:last-child{border-bottom:none}
+  .specimen{line-height:1.02;color:var(--ink)}
+  .s-disp{font-family:'Fraunces',serif;font-weight:900;font-variation-settings:"opsz" 144;
+          font-size:clamp(2.2rem,6vw,3.4rem);letter-spacing:-.02em}
+  .s-disp em{font-style:italic;font-weight:600;color:var(--radar-rain)}
+  .s-italic{font-family:'Newsreader',serif;font-style:italic;font-size:clamp(1.3rem,4vw,1.9rem);color:var(--ink-soft)}
+  .s-dev{font-family:'Tiro Devanagari Marathi',serif;font-size:clamp(2rem,7vw,2.8rem);color:var(--ink)}
+  .s-mono{font-family:'IBM Plex Mono',monospace;font-size:clamp(1.05rem,3.4vw,1.4rem);
+          color:var(--ink);font-variant-numeric:tabular-nums}
+  .spec-note{color:var(--ink-soft);font-size:.9rem;font-style:italic;max-width:70ch}
+
+  /* ================= ascii wireframe ================= */
+  pre.wire{
+    font-family:'IBM Plex Mono',monospace;font-size:.78rem;line-height:1.4;color:var(--ink);
+    background:var(--paper-2);border:1px solid var(--rule);padding:var(--s-5);
+    overflow-x:auto;margin:var(--s-4) 0
+  }
+
+  /* ================= figure cards (Plate I — three weathers) ================= */
+  .figs{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:var(--s-4) 0}
+  figure.fig{margin:0}
+  .card{
+    background:var(--paper-2);border:1px solid var(--rule);position:relative;overflow:hidden;
+    display:flex;flex-direction:column;min-height:430px
+  }
+  .card-top{
+    display:flex;justify-content:space-between;align-items:center;gap:8px;
+    padding:13px 15px;border-bottom:1px solid var(--rule);
+    font-family:'IBM Plex Mono',monospace;font-size:.66rem;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--ink-soft);position:relative;z-index:2
+  }
+  .card-top .loc{color:var(--ink);font-weight:500}
+  .card-body{padding:24px 15px 16px;flex:1;position:relative;z-index:2}
+  .verdict{font-family:'Fraunces',serif;font-weight:900;font-variation-settings:"opsz" 144;
+           font-size:clamp(2rem,4.4vw,2.6rem);line-height:.93;letter-spacing:-.015em;color:var(--ink)}
+  .reading{font-family:'IBM Plex Mono',monospace;font-size:.84rem;margin-top:11px;color:var(--ink-soft);
+           font-variant-numeric:tabular-nums;letter-spacing:.01em}
+  .fig-advice{font-family:'Newsreader',serif;font-style:italic;font-size:1.02rem;margin-top:14px;
+              max-width:26ch;color:var(--ink)}
+  .card-foot{padding:11px 15px;border-top:1px solid var(--rule);position:relative;z-index:2;
+             font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.04em;
+             color:var(--ink-soft);text-transform:uppercase}
+  .fig-cap{font-family:'Newsreader',serif;font-style:italic;font-size:.88rem;color:var(--ink-soft);margin-top:10px}
+
+  /* the rising-water gauge: engraved ruler + climbing water-fill, behind text (z1) */
+  .gauge{position:absolute;left:0;right:0;bottom:0;z-index:1;pointer-events:none;border-top:1px solid currentColor}
+  .gauge::before{content:"";position:absolute;inset:0;
+     background:linear-gradient(180deg,
+       color-mix(in srgb,currentColor 10%,transparent),
+       color-mix(in srgb,currentColor 30%,transparent))}
+  .ticks{position:absolute;right:9px;top:62px;bottom:48px;width:30px;z-index:1;display:flex;
+         flex-direction:column;justify-content:space-between;align-items:flex-end;
+         font-family:'IBM Plex Mono',monospace;font-size:.55rem;color:var(--ink-soft);
+         font-variant-numeric:tabular-nums}
+  .ticks span{position:relative;padding-right:10px}
+  .ticks span::after{content:"";position:absolute;right:0;top:50%;width:7px;height:1px;background:var(--rule)}
+  .ticks .unit{padding-right:10px;color:var(--ink-soft);opacity:.8}
+  /* live numeric cursor pinned onto the gauge (grafted from Reflectivity Console) */
+  .cursor{position:absolute;right:42px;z-index:2;transform:translateY(50%);
+          font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ink);
+          background:var(--paper);border:1px solid currentColor;padding:1px 5px;
+          font-variant-numeric:tabular-nums;white-space:nowrap}
+  .cursor::after{content:"";position:absolute;left:100%;top:50%;width:9px;height:1px;background:currentColor;transform:translateY(-50%)}
+
+  /* per-weather colouring — ONE radar hue per card (colour IS the reading) */
+  .f-dry{color:var(--radar-dry)}     .f-dry .verdict{color:var(--radar-dry)}     .f-dry .gauge{height:10px}   .f-dry .cursor{bottom:10px}
+  .f-rain{color:var(--radar-rain)}   .f-rain .verdict{color:var(--radar-rain)}   .f-rain .gauge{height:112px} .f-rain .cursor{bottom:112px}
+  .f-flood{color:var(--radar-flood)} .f-flood .verdict{color:var(--radar-now)}   .f-flood .gauge{height:212px} .f-flood .cursor{bottom:212px}
+  /* storm-light: a single warm gold glint on the FLOOD gauge only */
+  .f-flood .gauge::after{content:"";position:absolute;left:0;right:0;top:0;height:54px;
+     background:linear-gradient(180deg,color-mix(in srgb,var(--storm-gold) 42%,transparent),transparent);
+     mix-blend-mode:screen;opacity:.55}
+  .flood-warn{color:var(--radar-flood);font-style:italic}
+
+  /* ================= NEXT-120-MIN timeline + tide plate (grafted) ================= */
+  .timeline{border:1px solid var(--rule);background:var(--paper-2);padding:var(--s-5);margin:var(--s-4) 0}
+  .tl-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;
+           font-family:'IBM Plex Mono',monospace;font-size:.68rem;letter-spacing:.1em;
+           text-transform:uppercase;color:var(--ink-soft);margin-bottom:14px}
+  .tl-head b{color:var(--ink);font-weight:500}
+  .tl-track{display:flex;gap:2px;height:54px}
+  .tl-bar{flex:1;position:relative;background:var(--paper-3);align-self:flex-end;min-width:0}
+  .tl-bar i{position:absolute;left:0;right:0;bottom:0;display:block}
+  .tl-axis{display:flex;justify-content:space-between;margin-top:7px;
+           font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ink-soft);
+           font-variant-numeric:tabular-nums;letter-spacing:.04em}
+  .tide{margin-top:18px}
+  .tide-lbl{font-family:'IBM Plex Mono',monospace;font-size:.66rem;letter-spacing:.1em;
+            text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;display:flex;
+            justify-content:space-between;font-variant-numeric:tabular-nums}
+  .tide-lbl b{color:var(--ink);font-weight:500}
+  .tide-track{height:14px;background:var(--paper-3);position:relative;overflow:hidden}
+  .tide-fill{position:absolute;left:0;top:0;bottom:0;
+             background:linear-gradient(90deg,color-mix(in srgb,var(--radar-rain) 30%,transparent),var(--radar-rain))}
+  .tide-mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--radar-flood)}
+  .tl-note{font-family:'Newsreader',serif;font-style:italic;font-size:.9rem;color:var(--ink-soft);margin-top:12px}
+
+  /* ================= diagrams (inline SVG, restyled to almanac) ================= */
+  .diagram{border:1px solid var(--rule);background:var(--paper-2);padding:var(--s-5);margin:var(--s-4) 0;overflow:hidden}
+  .diagram svg{display:block;width:100%;height:auto;max-width:100%}
+  .dia-cap{font-family:'Newsreader',serif;font-style:italic;font-size:.9rem;color:var(--ink-soft);margin:12px 2px 0;max-width:74ch}
+  .dia-cap b{color:var(--ink);font-style:normal;font-weight:600}
+  .dia svg text{font-family:'Newsreader',serif}
+  .dia .t-mono{font-family:'IBM Plex Mono',monospace}
+  .dia .t-disp{font-family:'Fraunces',serif;font-weight:900}
+  .dia .t-lbl{font-family:'IBM Plex Mono',monospace;letter-spacing:.06em;text-transform:uppercase}
+
+  /* ================= live demo (progressive enhancement) ================= */
+  .demo-wrap{display:grid;grid-template-columns:300px minmax(0,1fr);gap:28px;align-items:start;margin:var(--s-5) 0}
+  .demo-controls{min-width:0}
+  .seg{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:var(--s-4)}
+  .seg button{
+    font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:.72rem;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-soft);background:var(--paper-2);border:1px solid var(--rule);
+    padding:9px 14px;cursor:pointer;transition:color .15s,border-color .15s,background .15s
+  }
+  .seg button:hover{color:var(--ink);border-color:var(--ink-soft)}
+  .seg button[aria-pressed="true"]{color:var(--paper);background:var(--accent,var(--radar-rain));border-color:var(--accent,var(--radar-rain))}
+  .slider-row{margin:var(--s-4) 0}
+  .slider-row label{display:flex;justify-content:space-between;align-items:baseline;
+                    font-family:'IBM Plex Mono',monospace;font-size:.68rem;letter-spacing:.12em;
+                    text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px}
+  .slider-row .rv{color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:0}
+  input[type=range].flood-slider{
+    -webkit-appearance:none;appearance:none;width:100%;height:6px;
+    background:linear-gradient(90deg,var(--radar-dry) 0%,var(--radar-rain) 35%,var(--radar-now) 64%,var(--radar-flood) 100%);
+    outline-offset:5px;cursor:pointer
+  }
+  input[type=range].flood-slider::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;
+    background:var(--paper);border:2px solid var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.3);cursor:pointer}
+  input[type=range].flood-slider::-moz-range-thumb{
+    width:20px;height:20px;border-radius:50%;background:var(--paper);border:2px solid var(--ink);cursor:pointer}
+  .demo-readout{margin-top:var(--s-4);font-family:'IBM Plex Mono',monospace;font-size:.74rem;
+                color:var(--ink-soft);line-height:1.8;font-variant-numeric:tabular-nums}
+  .demo-readout b{color:var(--ink)}
+  .demo-readout .ac{color:var(--accent,var(--radar-rain))}
+  .demo-hint{font-family:'Newsreader',serif;font-style:italic;font-size:.88rem;color:var(--ink-soft);margin-top:8px}
+  /* the live plate recolours via --accent */
+  .card.live{color:var(--accent,var(--radar-dry))}
+  .card.live .verdict{color:var(--accent,var(--radar-dry))}
+  .card.live .gauge{color:var(--accent,var(--radar-dry));transition:height .55s cubic-bezier(.2,.7,.2,1)}
+  .card.live .cursor{color:var(--accent,var(--radar-dry));transition:bottom .55s cubic-bezier(.2,.7,.2,1)}
+
+  /* details (collapsible specimen-bench) */
+  details.coll{margin:var(--s-4) 0;border:1px solid var(--rule);background:var(--paper-2)}
+  details.coll>summary{cursor:pointer;list-style:none;padding:12px 16px;display:flex;align-items:center;gap:.6em;
+    font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:.72rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink)}
+  details.coll>summary::-webkit-details-marker{display:none}
+  details.coll>summary::before{content:"+";color:var(--radar-rain);font-weight:600}
+  details.coll[open]>summary::before{content:"–"}
+  details.coll>summary:hover{background:var(--paper-3)}
+  details.coll .coll-body{padding:4px 16px 16px}
+
+  /* doc footer */
+  .footer-doc{margin-top:var(--s-8);padding-top:var(--s-5);border-top:2px solid var(--ink);
+    font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--ink-soft);letter-spacing:.03em;line-height:1.7}
+
+  /* contents index */
+  .contents{margin:var(--s-6) 0 0;border:1px solid var(--rule);background:var(--paper-2);padding:var(--s-5)}
+  .contents .ck{font-family:'IBM Plex Mono',monospace;font-size:.66rem;letter-spacing:.14em;
+                text-transform:uppercase;color:var(--ink-soft);margin-bottom:12px}
+  .contents ol{list-style:none;columns:2;column-gap:32px}
+  .contents li{margin:.18em 0;break-inside:avoid}
+  .contents a{display:flex;gap:.6em;text-decoration:none;color:var(--ink-soft);
+    font-family:'Newsreader',serif;font-size:.94rem;padding:2px 0;border-bottom:1px solid transparent}
+  .contents a:hover,.contents a:focus-visible{color:var(--ink);border-bottom-color:var(--rule)}
+  .contents a .cn{font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--radar-rain);flex:none;min-width:2.2em}
+
+  /* copy toast */
+  .copied-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(8px);
+    background:var(--ink);color:var(--paper);font-family:'IBM Plex Mono',monospace;font-size:.78rem;
+    padding:9px 16px;opacity:0;pointer-events:none;z-index:50;transition:opacity .2s,transform .2s}
+  .copied-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ================= responsive ================= */
+  @media (max-width:760px){
+    .figs{grid-template-columns:1fr}
+    .plate-margin{margin-left:0;text-align:left;flex-basis:100%}
+    .demo-wrap{grid-template-columns:1fr}
+    .contents ol{columns:1}
+  }
+  @media (max-width:380px){
+    .mast-meta{text-align:left;flex-basis:100%}
+  }
+
+  /* ================= motion (enhancement only; content never hidden) ================= */
+  @media (prefers-reduced-motion:no-preference){
+    .f-rain .gauge,.f-flood .gauge,.card.live .gauge{animation:swell 6.5s ease-in-out infinite alternate}
+    .dia .pulse{animation:flowMove 5s linear infinite}
+    .dia .pulse.train{animation-duration:7s;opacity:.75}
+    @keyframes flowMove{to{offset-distance:100%}}
+    .dia .shimmer{animation:sweep 4.8s ease-in-out infinite}
+    @keyframes sweep{0%{transform:translateX(-14%)}50%{transform:translateX(112%)}100%{transform:translateX(-14%)}}
+    .dia .node.active .ring{animation:nodePulse 2.4s ease-in-out infinite}
+    @keyframes nodePulse{0%,100%{opacity:.22;r:34}50%{opacity:.6;r:39}}
+    .dia .arrow.lit{animation:arrowGlow 2.4s ease-in-out infinite}
+    @keyframes arrowGlow{0%,100%{opacity:.4}50%{opacity:1}}
+  }
+  @keyframes swell{from{transform:translateY(4px)}to{transform:translateY(0)}}
+  @media (prefers-reduced-motion:reduce){
+    html:focus-within{scroll-behavior:auto}
+    .dia .shimmer{display:none}
+    .dia .arrow.lit{opacity:.85}
+    .dia .node.active .ring{opacity:.5}
+    .dia .pulse{offset-distance:60%}
+  }
+  :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===================== MASTHEAD ===================== -->
+  <header class="masthead">
+    <div class="anchor" lang="mr">पाऊस</div>
+    <div class="mast-meta">
+      The Mumbai Monsoon Almanac<br>
+      Frontend design doc · <b>your exact spot, next two hours</b><br>
+      Readings by Open-Meteo · rendered in the system it specifies
+    </div>
+  </header>
+
+  <!-- ===================== HERO (the thesis) ===================== -->
+  <section class="hero">
+    <p class="dateline">Frontend design doc · v1 · build top to bottom, verify against Plate XII</p>
+    <h1 class="headline">Will it rain at my spot in the <em>next two hours?</em></h1>
+    <p class="standfirst">One phone-first page that answers a single question in two seconds — <b>go now, or wait twenty minutes</b> — set as a Bombay weather diary, where the colour on the page <em>is</em> the live radar reading and the water rises off a printed gauge the way the street actually floods.</p>
+    <span class="dropline"><span class="dot"></span>one document · <b>17 plates</b> · diagrams, tables &amp; a live state demo · supersedes <b>FRONTEND-DESIGN-SPEC.md</b></span>
+
+    <nav class="contents" aria-label="Contents">
+      <div class="ck">Contents — the plates</div>
+      <ol>
+        <li><a href="#s1"><span class="cn">I</span> Overview &amp; thesis</a></li>
+        <li><a href="#sA"><span class="cn">II</span> How it works · data flow</a></li>
+        <li><a href="#s2"><span class="cn">III</span> Design principles</a></li>
+        <li><a href="#s3"><span class="cn">IV</span> Design tokens</a></li>
+        <li><a href="#sD"><span class="cn">V</span> Radar scale → colour</a></li>
+        <li><a href="#s4"><span class="cn">VI</span> Typography</a></li>
+        <li><a href="#s5"><span class="cn">VII</span> Layout &amp; grid</a></li>
+        <li><a href="#s6"><span class="cn">VIII</span> Component specs</a></li>
+        <li><a href="#sE"><span class="cn">IX</span> Verdict anatomy</a></li>
+        <li><a href="#s7"><span class="cn">X</span> States &amp; live demo</a></li>
+        <li><a href="#sB"><span class="cn">XI</span> Verdict state machine</a></li>
+        <li><a href="#sC"><span class="cn">XII</span> Rising-water mechanism</a></li>
+        <li><a href="#sT"><span class="cn">XIII</span> Next 120 min &amp; tide</a></li>
+        <li><a href="#s8"><span class="cn">XIV</span> Motion</a></li>
+        <li><a href="#s9"><span class="cn">XV</span> Responsive</a></li>
+        <li><a href="#s10"><span class="cn">XVI</span> Accessibility</a></li>
+        <li><a href="#s11"><span class="cn">XVII</span> Microcopy &amp; voice</a></li>
+        <li><a href="#s12"><span class="cn">XVIII</span> Build handoff</a></li>
+      </ol>
+    </nav>
+  </section>
+
+  <!-- ===================== PLATE I — OVERVIEW ===================== -->
+  <section id="s1" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate I</span>
+      <h2 class="plate-title">Overview &amp; design thesis</h2>
+      <span class="plate-margin">what the page is, and why it does not look like every other weather app</span>
+    </div>
+    <p class="lead">A phone-first single page that answers one question in two seconds: will it rain at my exact Mumbai spot in the next two hours — should I leave now?</p>
+    <p><strong>What it is.</strong> Free, static (HTML + CSS + vanilla JS), calls Open-Meteo directly in the browser, applies a tiny calibrated model (<code>model.json</code>) as plain arithmetic.</p>
+    <p><strong>Who it's for.</strong> A Mumbai person on their phone, mid-monsoon, about to step out the door. Not a meteorologist. They want a decision — <em>go now, or wait twenty minutes</em> — not a dashboard.</p>
+    <p><strong>The single job.</strong> Deliver one unmistakable verdict, recoloured so the <em>reading itself</em> signals the state before a word is read.</p>
+    <p><strong>Direction, one line.</strong> <em>A Bombay monsoon almanac — पाऊस set in print, the IMD radar reflectivity scale used as hand-tinted data-ink, and rising flood-water read off an engraved gauge. The page reads like a weather diary tuned to your street.</em></p>
+    <p><strong>Why this isn't an AI default.</strong> AI design clusters around three looks: (1) cream + high-contrast serif + terracotta, (2) near-black + one bright accent, (3) broadsheet hairline columns. This refuses all three. The honest material of a Bombay weather diary in July isn't cream stationery — it's rain-damp newsprint, which goes cool grey-green, so the page sits on <strong>wet newsprint #dde2dc</strong> with <strong>storm-ink #16221f</strong>. The display face is <strong>Fraunces</strong> (a soft, optically-sized old-style with warmth) instead of the over-used Playfair Didone; the reading voice is true <strong>Newsreader italic</strong>; instruments are <strong>IBM Plex Mono</strong>; the Marathi anchor पाऊस is set in a real Marathi serif, <strong>Tiro Devanagari Marathi</strong>. Colour is near-monochrome and the radar scale appears <em>only</em> as data-ink on the live reading — one hue at a time.</p>
+  </section>
+
+  <!-- ===================== PLATE II — DATA FLOW ===================== -->
+  <section id="sA" class="plate-sec dia">
+    <div class="plate-head">
+      <span class="plate-no">Plate II</span>
+      <h2 class="plate-title">How it works — data flow</h2>
+      <span class="plate-margin">the live path is $0 and keyless; training runs offline in CI</span>
+    </div>
+    <p>The whole product runs in the browser. The live path is <strong>$0 and keyless</strong>: the browser calls Open-Meteo directly, <code>nowcast.js</code> applies the tiny <code>model.json</code> as arithmetic, and the verdict paints the UI. The training path (METAR + IMERG → fit → ship a new <code>model.json</code>) runs <em>offline in CI</em> — it never touches the runtime.</p>
+    <div class="diagram">
+      <svg viewBox="0 0 920 320" role="img" aria-label="Data flow: the browser calls the keyless Open-Meteo API, nowcast.js applies model.json, producing a verdict that paints the UI. Separately and offline, a CI training path turns METAR and IMERG data into a new model.json.">
+        <defs>
+          <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#4a5853"/></marker>
+          <linearGradient id="liveLink" x1="0" x2="1"><stop offset="0" stop-color="#2f7db0"/><stop offset="1" stop-color="#5a8f86"/></linearGradient>
+        </defs>
+        <text x="20" y="34" class="t-lbl" fill="#4a5853" font-size="12">Live path · $0 · keyless · in-browser</text>
+        <path d="M120,96 H300" fill="none" stroke="#a9b3ac" stroke-width="2" marker-end="url(#ah)"/>
+        <path d="M420,96 H560" fill="none" stroke="#a9b3ac" stroke-width="2" marker-end="url(#ah)"/>
+        <path d="M680,96 H800" fill="none" stroke="#a9b3ac" stroke-width="2" marker-end="url(#ah)"/>
+        <g>
+          <rect x="20" y="72" width="100" height="48" rx="2" fill="#d3d9d2" stroke="#16221f"/>
+          <text x="70" y="101" text-anchor="middle" fill="#16221f" font-size="13" font-weight="600">Browser</text>
+        </g>
+        <g>
+          <rect x="300" y="72" width="120" height="48" rx="2" fill="#d3d9d2" stroke="#2f7db0"/>
+          <text x="360" y="95" text-anchor="middle" fill="#16221f" font-size="12" font-weight="600">Open-Meteo</text>
+          <text x="360" y="111" text-anchor="middle" class="t-mono" fill="#2f7db0" font-size="9">keyless API</text>
+        </g>
+        <g>
+          <rect x="560" y="72" width="120" height="48" rx="2" fill="#d3d9d2" stroke="#16221f"/>
+          <text x="620" y="95" text-anchor="middle" class="t-mono" fill="#16221f" font-size="11">nowcast.js</text>
+          <text x="620" y="111" text-anchor="middle" fill="#4a5853" font-size="9">apply model.json</text>
+        </g>
+        <g>
+          <rect x="800" y="72" width="100" height="48" rx="2" fill="#d3d9d2" stroke="#5a8f86"/>
+          <text x="850" y="95" text-anchor="middle" fill="#16221f" font-size="12" font-weight="600">Verdict</text>
+          <text x="850" y="111" text-anchor="middle" fill="#4a5853" font-size="9">→ paint UI</text>
+        </g>
+        <circle class="pulse" r="5" fill="url(#liveLink)" style="offset-path:path('M70,96 H360 M360,96 H620 M620,96 H850');offset-rotate:0deg">
+          <animate attributeName="opacity" values="0;1;1;0" dur="5s" repeatCount="indefinite"/>
+        </circle>
+        <line x1="20" y1="170" x2="900" y2="170" stroke="#a9b3ac" stroke-dasharray="3 5"/>
+        <text x="20" y="206" class="t-lbl" fill="#4a5853" font-size="12">Training path · offline in CI · ships a new model.json</text>
+        <path d="M180,268 H320" fill="none" stroke="#a9b3ac" stroke-width="2" marker-end="url(#ah)"/>
+        <path d="M460,268 H600" fill="none" stroke="#a9b3ac" stroke-width="2" marker-end="url(#ah)"/>
+        <g>
+          <rect x="20" y="244" width="160" height="48" rx="2" fill="#c7cec6" stroke="#4a5853"/>
+          <text x="100" y="267" text-anchor="middle" class="t-mono" fill="#16221f" font-size="11">METAR · IMERG</text>
+          <text x="100" y="283" text-anchor="middle" fill="#4a5853" font-size="9">ground truth (free)</text>
+        </g>
+        <g>
+          <rect x="320" y="244" width="140" height="48" rx="2" fill="#c7cec6" stroke="#4a5853"/>
+          <text x="390" y="267" text-anchor="middle" fill="#16221f" font-size="12" font-weight="600">Train (CI)</text>
+          <text x="390" y="283" text-anchor="middle" fill="#4a5853" font-size="9">fit corrector</text>
+        </g>
+        <g>
+          <rect x="600" y="244" width="150" height="48" rx="2" fill="#d3d9d2" stroke="#5a8f86"/>
+          <text x="675" y="273" text-anchor="middle" class="t-mono" fill="#16221f" font-size="12">model.json</text>
+        </g>
+        <path d="M675,244 C675,180 620,150 620,120" fill="none" stroke="#5a8f86" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#ah)"/>
+        <text x="700" y="186" fill="#4a5853" font-size="9">shipped as a static asset</text>
+        <circle class="pulse train" r="4" fill="#4a5853" style="offset-path:path('M100,268 H390 M390,268 H675');offset-rotate:0deg">
+          <animate attributeName="opacity" values="0;.8;.8;0" dur="7s" repeatCount="indefinite"/>
+        </circle>
+      </svg>
+      <p class="dia-cap"><b>Plate II · Data flow.</b> Top row is the live, in-browser, keyless, $0 path that produces the verdict on every open. Bottom row is the offline CI training loop that periodically ships a fresh <code>model.json</code> — the only thing crossing between them (dashed line). A pulse travels each path to show direction of flow.</p>
+    </div>
+  </section>
+
+  <!-- ===================== PLATE III — PRINCIPLES ===================== -->
+  <section id="s2" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate III</span>
+      <h2 class="plate-title">Design principles</h2>
+      <span class="plate-margin">five rules; when in doubt, re-read them</span>
+    </div>
+    <ol class="body">
+      <li><strong>Big answer, quiet detail.</strong> The verdict is the loudest thing on the page by an order of magnitude. Everything else is whispered — small, low-contrast, secondary. If two things compete for the eye, one of them is wrong.</li>
+      <li><strong>Colour is information, never decoration.</strong> The page is near-monochrome; radar colour appears <em>only</em> as data-ink on the live reading, one hue at a time, pulled from the IMD reflectivity scale. Flood red is reserved for genuine flood risk only — that scarcity is what makes it mean something.</li>
+      <li><strong>It loads ready.</strong> The basic answer needs zero taps. No spinner that spins forever, no "tap to load". Within two seconds of opening, the verdict is on screen.</li>
+      <li><strong>The subject is the signature.</strong> The one bold element is the rising water — read off an engraved gauge, water climbing a Mumbai street. Spend boldness there; keep everything around it disciplined and plain.</li>
+      <li><strong>One thumb, honest voice.</strong> Built for a thumb on a phone (big targets, reachable). Copy is plain, active, Mumbai-tuned, in a weather-diary voice — "measured now", "leave in the next fifteen minutes", a verdict you can act on.</li>
+    </ol>
+  </section>
+
+  <!-- ===================== PLATE IV — TOKENS ===================== -->
+  <section id="s3" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate IV</span>
+      <h2 class="plate-title">Design tokens</h2>
+      <span class="plate-margin">all live in <code>:root</code>; never hard-code a hex in a component</span>
+    </div>
+
+    <h3><span class="h3-no">4.1</span>Paper &amp; ink — the almanac surfaces (always on)</h3>
+    <p>The page is rain-damp newsprint, deliberately cool grey-green — not cream, not black. These are constant in every state. Click any plate below to copy its hex.</p>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:#dde2dc" data-hex="#dde2dc"></div><div class="meta"><div class="nm">Wet Newsprint</div><div class="hex">--paper · #dde2dc</div><div class="desc">Page background — rain-soaked paper.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#d3d9d2" data-hex="#d3d9d2"></div><div class="meta"><div class="nm">Damp Plate</div><div class="hex">--paper-2 · #d3d9d2</div><div class="desc">Plate / card surfaces, a half-tone deeper.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#16221f" data-hex="#16221f"></div><div class="meta"><div class="nm">Storm Ink</div><div class="hex">--ink · #16221f</div><div class="desc">Headlines, the 2px masthead rule, primary text.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#4a5853" data-hex="#4a5853"></div><div class="meta"><div class="nm">Wet Stone</div><div class="hex">--ink-soft · #4a5853</div><div class="desc">Captions, mono labels, secondary text.</div></div></div>
+    </div>
+
+    <h3><span class="h3-no">4.2</span>Radar accent — data-ink, off the reflectivity ramp</h3>
+    <p>Exactly <strong>one</strong> is active at a time, on the live reading only. The active accent colours the verdict, the leave-now marker, and the water-fill on the gauge. Sourced from the dBZ reflectivity ramp Indian meteorologists read (full calibration in Plate V).</p>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:#5a8f86" data-hex="#5a8f86"><span class="dbz">&lt; 20 dBZ</span></div><div class="meta"><div class="nm">Sea-glass · dry</div><div class="hex">--radar-dry · #5a8f86</div><div class="desc">Sits off the ramp, so "no rain" reads restful.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#2f7db0" data-hex="#2f7db0"><span class="dbz">20–35 dBZ</span></div><div class="meta"><div class="nm">Radar blue · incoming</div><div class="hex">--radar-rain · #2f7db0</div><div class="desc">Light–moderate rain. The most-shown state.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#d98a2b" data-hex="#d98a2b"><span class="dbz">35–48 dBZ</span></div><div class="meta"><div class="nm">Amber · raining now</div><div class="hex">--radar-now · #d98a2b</div><div class="desc">Heavy, bridges toward flood by mm·h⁻¹.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#c0392b" data-hex="#c0392b"><span class="dbz">&gt; 48 dBZ</span></div><div class="meta"><div class="nm">Flood red · reserved</div><div class="hex">--radar-flood · #c0392b</div><div class="desc">Flood-watch only. Never the default accent.</div></div></div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>State</th><th>Token</th><th>Hex</th><th>dBZ band</th><th>Source / rationale</th></tr></thead>
+      <tbody>
+        <tr><td>Dry / safe</td><td><code>--radar-dry</code></td><td class="num">#5a8f86</td><td class="num">&lt; 20</td><td>Sea-glass calm — sits <em>off</em> the rain ramp, so "no rain" reads restful, not alarming.</td></tr>
+        <tr><td>Rain coming</td><td><code>--radar-rain</code></td><td class="num">#2f7db0</td><td class="num">20–35</td><td>Radar light-to-moderate blue. The "incoming" colour — most shown.</td></tr>
+        <tr><td>Raining now</td><td><code>--radar-now</code></td><td class="num">#d98a2b</td><td class="num">35–48</td><td>Radar amber; biases hotter as mm·h⁻¹ rises (see 8.3).</td></tr>
+        <tr><td>Flood risk</td><td><code>--radar-flood</code></td><td class="num">#c0392b</td><td class="num">&gt; 48</td><td>Radar red. <strong>Reserved</strong> — flood line + risen water only.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note"><span class="note-k">Rule for the accent</span>Components reference <code>var(--accent)</code>. The state class on <code>#app</code> (or a JS style write) sets <code>--accent</code> to the right ramp colour. This structurally enforces "one accent at a time" — components never pick a colour. <strong>Robustness:</strong> if any gradient text is ever introduced for the verdict or पाऊस, set a solid <code>color</code> to the mid-stop hue <em>first</em>, then layer <code>-webkit-background-clip:text</code> — never ship clip-text with <code>color:transparent</code> alone.</div>
+
+    <h3><span class="h3-no">4.3</span>Spacing · z-index</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Group</th><th>Token</th><th>Value</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="6">Spacing (base)</td><td><code>--s-3</code></td><td class="num">12px</td><td>Pill / row vertical padding.</td></tr>
+        <tr><td><code>--s-4</code></td><td class="num">16px</td><td>Default block gap.</td></tr>
+        <tr><td><code>--s-5</code></td><td class="num">24px</td><td>Page side padding (mobile), section gap.</td></tr>
+        <tr><td><code>--s-6</code></td><td class="num">34px</td><td>Hero breathing room.</td></tr>
+        <tr><td><code>--s-7</code></td><td class="num">52px</td><td>Hero / section top padding.</td></tr>
+        <tr><td><code>--s-8</code></td><td class="num">72px</td><td>Between plates.</td></tr>
+        <tr><td rowspan="3">Z-index</td><td>rising water / gauge</td><td class="num">1</td><td>Behind content, never hides text.</td></tr>
+        <tr><td>content</td><td class="num">2</td><td>Everything readable.</td></tr>
+        <tr><td>focus ring</td><td class="num">—</td><td>Via <code>outline</code>, never raised.</td></tr>
+      </tbody>
+    </table></div>
+    <p>This is a flat, printed page — no card stack, no drop shadows on content. Depth comes from the half-tone paper tints and the engraved gauge, not from elevation.</p>
+  </section>
+
+  <!-- ===================== PLATE V — RADAR SCALE → COLOUR ===================== -->
+  <section id="sD" class="plate-sec dia">
+    <div class="plate-head">
+      <span class="plate-no">Plate V</span>
+      <h2 class="plate-title">Radar scale → colour mapping</h2>
+      <span class="plate-margin">colour IS the reading — documented as a calibrated dBZ scale</span>
+    </div>
+    <p>The accent palette isn't picked for taste — it's lifted from the <strong>IMD dBZ reflectivity ramp</strong> that Indian meteorologists read off radar. Higher reflectivity = heavier rain = hotter colour. Mapping the app's four accent tokens onto that ramp is what makes "colour = the live rain reading" honest rather than decorative. Below, the ramp is rendered as an almanac's engraved colour plate, each band labelled with its dBZ range and meaning.</p>
+    <div class="diagram">
+      <svg viewBox="0 0 920 230" role="img" aria-label="The IMD radar dBZ reflectivity ramp from low to high, with the four app accent tokens mapped onto matching bands: clear sea-glass off the ramp, rain blue at 20 to 35 dBZ, amber at 35 to 48 dBZ, and flood red above 48 dBZ.">
+        <defs>
+          <linearGradient id="radarRamp" x1="0" x2="1">
+            <stop offset="0" stop-color="#5a8f86"/><stop offset="0.18" stop-color="#5a8f86"/>
+            <stop offset="0.30" stop-color="#2f7db0"/><stop offset="0.55" stop-color="#2f7db0"/>
+            <stop offset="0.66" stop-color="#d98a2b"/><stop offset="0.80" stop-color="#d98a2b"/>
+            <stop offset="0.92" stop-color="#c0392b"/><stop offset="1" stop-color="#c0392b"/>
+          </linearGradient>
+          <clipPath id="rampClip"><rect x="20" y="40" width="880" height="46"/></clipPath>
+        </defs>
+        <text x="20" y="28" class="t-lbl" fill="#4a5853" font-size="12">IMD radar reflectivity — low → high dBZ</text>
+        <rect x="20" y="40" width="880" height="46" fill="url(#radarRamp)" stroke="#16221f"/>
+        <g clip-path="url(#rampClip)">
+          <rect class="shimmer" x="-80" y="40" width="80" height="46" fill="#ffffff" opacity="0.16"/>
+        </g>
+        <g stroke="#16221f" stroke-width="1.5">
+          <line x1="178" y1="40" x2="178" y2="86"/><line x1="503" y1="40" x2="503" y2="86"/><line x1="747" y1="40" x2="747" y2="86"/>
+        </g>
+        <g font-size="11" text-anchor="middle">
+          <g><line x1="99" y1="86" x2="99" y2="116" stroke="#5a8f86"/><text class="t-mono" x="99" y="134" fill="#16221f" font-size="11">--radar-dry</text><text x="99" y="150" fill="#4a5853" font-size="9.5">dry / off-ramp</text><text x="99" y="166" fill="#16221f" class="t-mono" font-size="9">&lt; 20 dBZ</text></g>
+          <g><line x1="340" y1="86" x2="340" y2="116" stroke="#2f7db0"/><text class="t-mono" x="340" y="134" fill="#16221f" font-size="11">--radar-rain</text><text x="340" y="150" fill="#4a5853" font-size="9.5">light–moderate</text><text x="340" y="166" fill="#16221f" class="t-mono" font-size="9">20–35 dBZ</text></g>
+          <g><line x1="625" y1="86" x2="625" y2="116" stroke="#d98a2b"/><text class="t-mono" x="625" y="134" fill="#16221f" font-size="11">--radar-now</text><text x="625" y="150" fill="#4a5853" font-size="9.5">heavy, by mm·h⁻¹</text><text x="625" y="166" fill="#16221f" class="t-mono" font-size="9">35–48 dBZ</text></g>
+          <g><line x1="824" y1="86" x2="824" y2="116" stroke="#c0392b"/><text class="t-mono" x="824" y="134" fill="#16221f" font-size="11">--radar-flood</text><text x="824" y="150" fill="#4a5853" font-size="9.5">reserved</text><text x="824" y="166" fill="#16221f" class="t-mono" font-size="9">&gt; 48 dBZ</text></g>
+        </g>
+        <text x="20" y="206" fill="#4a5853" font-size="10">Clear sits deliberately <tspan font-style="italic">off</tspan> the rain ramp so "no rain" reads restful. Red is the top band only — never the default accent.</text>
+      </svg>
+      <p class="dia-cap"><b>Plate V · Radar → palette.</b> Each accent token is anchored to a reflectivity band, so the reading's colour <em>is</em> the rain intensity. A faint shimmer sweeps the ramp to draw the eye across the low-to-high mapping.</p>
+    </div>
+  </section>
+
+  <!-- ===================== PLATE VI — TYPOGRAPHY ===================== -->
+  <section id="s4" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate VI</span>
+      <h2 class="plate-title">Typography</h2>
+      <span class="plate-margin">four faces, each with a job — the type carries the page's voice</span>
+    </div>
+    <p>Four intentional faces, in one combined Google Fonts request (Plate XVIII). Fraunces for the verdict (almanac soft-serif), Newsreader italic for the reading voice, IBM Plex Mono for instruments, and a real Marathi serif for the anchor.</p>
+
+    <h3><span class="h3-no">6.1</span>Faces &amp; roles (live specimens)</h3>
+    <div class="spec-row">
+      <div class="lbl">Display — the verdict · Fraunces 900 + italic 600</div>
+      <div class="specimen s-disp">Rain in about <em>forty min.</em></div>
+      <div class="spec-note">Soft optical old-style — almanac, hand-set. The emphasis word turns italic + radar-blue: the human voice inside the instrument. Chosen over Playfair/Didone to dodge the default editorial serif.</div>
+    </div>
+    <div class="spec-row">
+      <div class="lbl">Reading voice — standfirst, advice, captions · Newsreader italic 18</div>
+      <div class="specimen s-italic">Leave in the next fifteen minutes and you stay dry the whole way.</div>
+      <div class="spec-note">A true reading italic. This is the weather-diary voice — conversational, sentence-case, the thing a generic magazine layout never bothers with.</div>
+    </div>
+    <div class="spec-row">
+      <div class="lbl">Cultural anchor · Tiro Devanagari Marathi</div>
+      <div class="specimen s-dev" lang="mr">पाऊस</div>
+      <div class="spec-note">"Rain" in Marathi, set in a real Marathi serif that harmonises with Fraunces (not a sans). It headlines the masthead — identity, not a tiny eyebrow. Constant; does not recolour with state.</div>
+    </div>
+    <div class="spec-row">
+      <div class="lbl">Instruments — readings, coordinates, ticks · IBM Plex Mono</div>
+      <div class="specimen s-mono">8.5 mm·h⁻¹ · 1 km · 312° · 47 dBZ</div>
+      <div class="spec-note">The meteorologist's voice. Tabular figures (<code>font-variant-numeric: tabular-nums</code>) so measured columns align like a real instrument. Proper unit notation: <code>mm·h⁻¹</code>, <code>dBZ</code>, bearing in degrees.</div>
+    </div>
+
+    <h3><span class="h3-no">6.2</span>Type scale</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Style</th><th>Family</th><th>Size</th><th>Weight</th><th>Tracking</th><th>Line-h</th><th>Case</th></tr></thead>
+      <tbody>
+        <tr><td>Verdict (hero)</td><td>Fraunces</td><td class="num">clamp(2.4,8.5vw,5.4rem)</td><td class="num">900</td><td class="num">-0.02em</td><td class="num">0.95</td><td>sentence</td></tr>
+        <tr><td>Verdict emphasis word</td><td>Fraunces italic</td><td class="num">inherits</td><td class="num">600</td><td class="num">-0.02em</td><td class="num">0.95</td><td>sentence</td></tr>
+        <tr><td>Marathi anchor पाऊस</td><td>Tiro Devanagari</td><td class="num">clamp(2.6,10vw,4.4rem)</td><td class="num">400</td><td class="num">0</td><td class="num">0.86</td><td>—</td></tr>
+        <tr><td>Standfirst / advice</td><td>Newsreader italic</td><td class="num">clamp(1.08,3.2vw,1.5rem)</td><td class="num">400</td><td class="num">0</td><td class="num">1.5</td><td>sentence</td></tr>
+        <tr><td>Reading / dropline</td><td>Plex Mono</td><td class="num">0.8rem</td><td class="num">400</td><td class="num">0.01em</td><td class="num">1.5</td><td>—</td></tr>
+        <tr><td>Plate title</td><td>Fraunces 600</td><td class="num">clamp(1.35,3.4vw,1.85rem)</td><td class="num">600</td><td class="num">-0.01em</td><td class="num">1.1</td><td>sentence</td></tr>
+        <tr><td>Plate number / kicker</td><td>Plex Mono</td><td class="num">0.74rem</td><td class="num">500</td><td class="num">0.14em</td><td class="num">1.4</td><td>UPPER</td></tr>
+        <tr><td>Flood line</td><td>Newsreader italic</td><td class="num">1.0rem</td><td class="num">400</td><td class="num">0</td><td class="num">1.4</td><td>sentence</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3><span class="h3-no">6.3</span>The Marathi anchor — usage rules</h3>
+    <ul>
+      <li><strong>Always present</strong>, every state, masthead-left — it headlines the page.</li>
+      <li>Colour: <code>var(--ink)</code> always. It does <strong>not</strong> recolour with state — it is a constant cultural anchor, not a status indicator, so it never competes with the verdict's state colour.</li>
+      <li>Never translated in the UI, never given a tooltip. It is identity, not information.</li>
+      <li>Screen-reader: <code>lang="mr"</code>, not <code>aria-hidden</code> — it reads as "पाऊस / rain" (Plate XVI).</li>
+    </ul>
+  </section>
+
+  <!-- ===================== PLATE VII — LAYOUT ===================== -->
+  <section id="s5" class="plate-sec dia">
+    <div class="plate-head">
+      <span class="plate-no">Plate VII</span>
+      <h2 class="plate-title">Layout &amp; grid</h2>
+      <span class="plate-margin">a single column — a "rain ticket" — with water at the base behind all</span>
+    </div>
+    <p>A single, centred, phone-height column. Location at the very top, the verdict owning the optical centre (~45% of viewport height), quiet detail below, the rising water anchored to the bottom edge behind everything, footer last.</p>
+    <ul>
+      <li><strong>Content max-width:</strong> <code>min(92vw, 30rem)</code> (≈480px). The column never gets wider, even on desktop — the phone-first feel is preserved (Plate XV).</li>
+      <li><strong>Vertical:</strong> <code>#app</code> is <code>min-height: 100svh</code>, flex column: header pinned top, hero flex-grows to claim the centre, details + footer at the bottom.</li>
+      <li><strong>Safe areas:</strong> page padding uses <code>max(--s-5, env(safe-area-inset-*))</code>. Keep the <code>viewport-fit=cover</code> meta.</li>
+    </ul>
+    <h3><span class="h3-no">7.1</span>ASCII wireframe (rain-coming state)</h3>
+    <pre class="wire">┌─────────────────────────────┐  ← wet-newsprint field, full bleed
+│ पाऊस              📍 Andheri ▾│  ← Tiro anchor (left) + location pill (right)
+│                             │     header, pinned top
+│                             │
+│   Rain in about *40 min.*   │  ← THE VERDICT — Fraunces 900, italic accent
+│   ~3 mm·h⁻¹                  │     mono reading under it
+│                             │     hero block, optically centred, ~45% height
+│ ▸ Leave in the next 15 min  │  ← leave-now action (only when rain incoming)
+│                             │
+│ ─────────────────────────── │  ← hairline
+│ MEASURED NOW    0.2mm · 3km │  ← mono label + tabular reading, quiet
+│ ⚠ Hindmata pooling likely   │  ← flood line (only if risky, --radar-flood)
+│ ─────────────────────────── │
+│ calibrated · model v1       │  ← footer line 1 (honesty)
+│ Weather data by Open-Meteo  │  ← footer line 2 (required attribution, linked)
+│▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│  ← THE RISING WATER — fixed to bottom, behind all</pre>
+    <p>In a <strong>dry, calm</strong> state only the anchor, pill, verdict, footer, and a thin waterline show — the leave action and flood line are absent (Plate X).</p>
+
+    <h3><span class="h3-no">7.2</span>Visual wireframe — mobile &amp; desktop frame</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 920 470" role="img" aria-label="Visual wireframe. Mobile: a single phone column with the Marathi anchor and location pill at top, the verdict owning the centre, a leave-now line, a measured-now row, footer, and rising water anchored at the bottom. Desktop: the same column centred and framed on the full field, water spanning the whole window behind it.">
+        <defs><marker id="ah3" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#4a5853"/></marker></defs>
+        <text x="20" y="28" class="t-lbl" fill="#4a5853" font-size="12">Mobile — single column "rain ticket"</text>
+        <rect x="20" y="42" width="220" height="408" rx="6" fill="#dde2dc" stroke="#16221f"/>
+        <rect x="21" y="372" width="218" height="77" fill="#2f7db0" opacity="0.16"/>
+        <rect x="21" y="372" width="218" height="2" fill="#2f7db0" opacity="0.6"/>
+        <text x="42" y="80" class="t-mono" fill="#16221f" font-size="13" lang="mr">पाऊस</text>
+        <rect x="150" y="64" width="74" height="22" rx="11" fill="#d3d9d2" stroke="#a9b3ac"/><text x="187" y="79" text-anchor="middle" fill="#16221f" font-size="9">📍 Andheri ▾</text>
+        <text x="42" y="184" class="t-disp" fill="#2f7db0" font-size="24">Rain in</text>
+        <text x="42" y="212" class="t-disp" fill="#2f7db0" font-size="24" font-style="italic">~40 min.</text>
+        <text x="42" y="236" class="t-mono" fill="#4a5853" font-size="11">~3 mm·h⁻¹</text>
+        <text x="42" y="276" fill="#16221f" font-size="11" font-style="italic">▸ Leave in 15 min</text>
+        <line x1="42" y1="300" x2="218" y2="300" stroke="#a9b3ac"/>
+        <text x="42" y="320" class="t-mono" fill="#4a5853" font-size="9">MEASURED NOW</text><text x="218" y="320" text-anchor="end" class="t-mono" fill="#16221f" font-size="9">0.2mm · 3km</text>
+        <text x="42" y="348" class="t-mono" fill="#4a5853" font-size="8">calibrated · model v1 · Open-Meteo</text>
+        <g font-size="9.5" fill="#4a5853">
+          <text x="252" y="80">◀ anchor + location pill (pinned top)</text>
+          <text x="252" y="198">◀ verdict owns the optical centre</text>
+          <text x="252" y="276">◀ leave action (only if rain coming)</text>
+          <text x="252" y="320">◀ measured-now (quiet, tabular)</text>
+          <text x="252" y="410" fill="#2f7db0">◀ rising water, fixed to bottom, behind all</text>
+        </g>
+        <text x="560" y="28" class="t-lbl" fill="#4a5853" font-size="12">Desktop — framed column on the full field</text>
+        <rect x="540" y="42" width="360" height="408" rx="6" fill="#d3d9d2" stroke="#a9b3ac"/>
+        <rect x="541" y="372" width="358" height="77" fill="#2f7db0" opacity="0.13"/>
+        <rect x="541" y="372" width="358" height="2" fill="#2f7db0" opacity="0.45"/>
+        <rect x="660" y="92" width="120" height="300" rx="6" fill="#dde2dc" stroke="#16221f"/>
+        <rect x="661" y="350" width="118" height="41" fill="#2f7db0" opacity="0.2"/>
+        <text x="672" y="120" class="t-mono" fill="#16221f" font-size="9" lang="mr">पाऊस</text>
+        <text x="672" y="208" class="t-disp" fill="#2f7db0" font-size="14">Rain in</text>
+        <text x="672" y="226" class="t-disp" fill="#2f7db0" font-size="14" font-style="italic">~40 min.</text>
+        <g font-size="9.5" fill="#4a5853">
+          <text x="540" y="80">column capped ≤ 30rem, centred</text>
+          <text x="540" y="430" fill="#2f7db0">water fills the whole window behind the frame</text>
+        </g>
+        <path d="M655,250 H600" stroke="#4a5853" stroke-width="1" marker-end="url(#ah3)" fill="none"/>
+        <text x="540" y="254" fill="#4a5853" font-size="9.5">same column,</text>
+        <text x="540" y="266" fill="#4a5853" font-size="9.5">never re-flows</text>
+      </svg>
+      <p class="dia-cap"><b>Plate VII · Responsive wireframe.</b> The phone column is canonical; larger screens frame it rather than re-flow it. Water is the field — on desktop it spans the whole window, not just the column.</p>
+    </div>
+  </section>
+
+  <!-- ===================== PLATE VIII — COMPONENTS ===================== -->
+  <section id="s6" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate VIII</span>
+      <h2 class="plate-title">Component specs</h2>
+      <span class="plate-margin">component by component; DOM IDs match existing <code>index.html</code></span>
+    </div>
+
+    <h3><span class="h3-no">8.1</span>Location pill — <code>#locality</code> in <code>.loc-pill</code></h3>
+    <p>A native <code>&lt;select&gt;</code> styled as a rounded pill, prefixed with 📍 and a ▾ affordance. The <em>only</em> primary control.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody>
+      <tr><td>Shape</td><td>fully rounded, border <code>1px var(--rule)</code>, background <code>--paper-2</code></td></tr>
+      <tr><td>Label</td><td>Plex Mono, colour <code>--ink</code></td></tr>
+      <tr><td>Pin &amp; caret</td><td>📍 prefix, ▾ via background-image or unicode; caret <code>--ink-soft</code></td></tr>
+      <tr><td>Touch target</td><td><strong>44×44px</strong> hit area (pad the select, not just the text)</td></tr>
+    </tbody></table></div>
+    <p><strong>Behaviour.</strong> On load, geolocation snaps the pill to the nearest locality label and renders for the user's real coordinates. Tapping opens the native OS picker (zero custom dropdown JS — fast, accessible, free). Choosing a locality re-renders for that locality's baked coordinates. <strong>Variants:</strong> resolved (area name) · loading (shows first locality immediately, never blank) · geo-denied (stays on default/last locality).</p>
+
+    <h3><span class="h3-no">8.2</span>Verdict hero — <code>#verdict</code> + <code>#verdict-sub</code> in <code>.hero</code></h3>
+    <p>The headline (<code>&lt;h1&gt;</code>) in Fraunces, plus a mono reading line. This is the page; it fills the optical centre. The emphasis word ("forty minutes") turns italic + accent.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody>
+      <tr><td>Headline type</td><td>Fraunces 900, <code>clamp(2.4rem,8.5vw,5.4rem)</code>, lh <code>0.95</code></td></tr>
+      <tr><td>Headline colour</td><td><code>var(--ink)</code>; emphasis word <code>var(--accent)</code> italic 600</td></tr>
+      <tr><td>Wrapping</td><td><code>text-wrap: balance</code>, two–three lines max on mobile</td></tr>
+      <tr><td>Reading line</td><td>Plex Mono, tabular-nums, <code>--ink-soft</code>, <code>mm·h⁻¹</code> notation</td></tr>
+      <tr><td>Alignment</td><td>Left-aligned (ticket feel), not centred</td></tr>
+    </tbody></table></div>
+
+    <h3><span class="h3-no">8.3</span>"Raining now" intensity</h3>
+    <p>When raining now, the accent shifts hotter by intensity along the amber band: <code>mm·h⁻¹ ≤ 1 → #d98a2b</code> warming toward flood red as rate rises. JS computes the blend and writes <code>--accent</code> as the resulting hex (crisp contrast, simpler reduced-motion).</p>
+
+    <h3><span class="h3-no">8.4</span>Leave-now action — <code>#leave</code></h3>
+    <p>One short imperative line with a <code>▸</code> marker that turns a forecast into a decision — rendered as a prominent <strong>solid-colour</strong> action element (never <code>background-clip:text</code>). Present <strong>only</strong> when rain is incoming. Marker <code>▸</code> in <code>var(--accent)</code>; left rule in the accent. Shown when <code>v.willRain &amp;&amp; v.startsInHrs &gt; 0</code>; hidden via the <code>hidden</code> attribute when raining now or dry.</p>
+    <div class="action"><span class="mk">▸</span><span>Leave in the next fifteen minutes to stay dry.</span></div>
+
+    <h3><span class="h3-no">8.5</span>Ground-reality row — <code>#measured-row</code> + <code>#measured</code></h3>
+    <p>A two-column row (label left, mono reading right): honesty device — distinguishes <em>measured now</em> from <em>forecast</em>. Label <code>--ink-soft</code> "MEASURED NOW"; value tabular-nums e.g. <code class="mono">0.2 mm · 3 km</code>; hairline top border. Omit the "· N km" segment cleanly when unknown (no "· undefined").</p>
+
+    <h3><span class="h3-no">8.6</span>Flood line — <code>#flood-row</code> + <code>#flood</code></h3>
+    <p>A single alert line — Mumbai's signature value. Present <strong>only</strong> when <code>floodRisk</code> returns <code>watch</code> or <code>high</code>. Newsreader italic, colour <code>var(--radar-flood)</code> (the only place red appears in text), <code>⚠</code> prefix. Low risk → row hidden. The water also tints red and rises (8.8).</p>
+
+    <h3><span class="h3-no">8.7</span>Footer — <code>.foot</code> (<code>#honesty</code> + attribution)</h3>
+    <p>Two tiny mono lines, <code>--ink-soft</code>. Line 1: <code>calibrated forecast for your spot · model vN</code> — "how we score ourselves" links to the public scoreboard. Line 2 (<strong>required</strong>): <code>Weather data by Open-Meteo.com</code>, linked to <code>https://open-meteo.com/</code> with <code>rel="noopener"</code>.</p>
+
+    <h3><span class="h3-no">8.8</span>The rising-water gauge — <code>#water</code> (the signature)</h3>
+    <p>A horizontal water body fixed to the <strong>bottom of the viewport</strong>, behind all content (<code>z-index:1</code>), read against a <strong>printed rainfall ruler</strong> engraved on the edge (mono tick labels 0–40, hairline ticks) — water <strong>rises up the scale</strong> as flood risk grows, with a live numeric cursor pinned at the waterline. The one bold, subject-true element — water climbing a Mumbai street. <em>It replaces the falling-rain canvas in the current <code>app.js</code>, a generic weather-app trope (Plate XVIII).</em></p>
+    <div class="tbl-wrap"><table><thead><tr><th>State</th><th>Height (of viewport)</th><th>Tint</th><th>Cursor read-off</th></tr></thead><tbody>
+      <tr><td>Dry / low</td><td class="num">thin base line</td><td class="num">sea-glass --radar-dry</td><td class="num">0 mm</td></tr>
+      <tr><td>Rain coming</td><td class="num">~12–15%</td><td class="num">--radar-rain</td><td class="num">~3 mm·h⁻¹</td></tr>
+      <tr><td>Raining now</td><td class="num">~18–22%</td><td class="num">--radar-now (amber)</td><td class="num">~9 mm·h⁻¹</td></tr>
+      <tr><td>Flood watch</td><td class="num">~22%</td><td class="num">--radar-flood + gold glint</td><td class="num">watch</td></tr>
+      <tr><td>Flood high</td><td class="num">~30%</td><td class="num">--radar-flood + gold glint</td><td class="num">high</td></tr>
+    </tbody></table></div>
+    <p><strong>Behaviour.</strong> One JS function — <code>water.setLevel(state, floodLevel, peakMm)</code> — sets target height + tint + cursor value; height transitions ~600ms. Driven by <strong>flood risk first</strong>, rain intensity second. A single warm <strong>storm-light glint</strong> appears on the flood-state fill only (CSS-only, behind text, reduced-motion gated). <strong>A11y:</strong> <code>role="img"</code> + an <code>aria-label</code> stating the level in words (Plate XVI).</p>
+
+    <h3><span class="h3-no">8.9</span>Rendered — the three core weathers (Plate I figure cards)</h3>
+    <div class="figs">
+      <figure class="fig">
+        <div class="card f-dry">
+          <div class="card-top"><span>fig. a — clear</span><span class="loc">Bandra</span></div>
+          <div class="card-body">
+            <div class="verdict">Dry for<br>two hours</div>
+            <div class="reading">0.0 mm · 2 km · clear</div>
+            <div class="fig-advice">Go whenever. The sky holds.</div>
+          </div>
+          <div class="ticks"><span>40</span><span>20</span><span>0</span><span class="unit">mm</span></div>
+          <div class="cursor">0 mm</div>
+          <div class="card-foot">calibrated for your spot</div>
+          <div class="gauge"></div>
+        </div>
+        <figcaption class="fig-cap">Dry — the waterline is a single engraved tick at the base.</figcaption>
+      </figure>
+      <figure class="fig">
+        <div class="card f-rain">
+          <div class="card-top"><span>fig. b — incoming</span><span class="loc">Andheri</span></div>
+          <div class="card-body">
+            <div class="verdict">Rain in<br>~40 min</div>
+            <div class="reading">0.2 mm · 3 km · ~3 mm·h⁻¹</div>
+            <div class="fig-advice">Leave within 15 min to stay dry.</div>
+          </div>
+          <div class="ticks"><span>40</span><span>20</span><span>0</span><span class="unit">mm</span></div>
+          <div class="cursor">23 dBZ</div>
+          <div class="card-foot">calibrated for your spot</div>
+          <div class="gauge"></div>
+        </div>
+        <figcaption class="fig-cap">Rain coming — radar blue, the gauge climbing the ruler.</figcaption>
+      </figure>
+      <figure class="fig">
+        <div class="card f-flood">
+          <div class="card-top"><span>fig. c — flood watch</span><span class="loc">Hindmata</span></div>
+          <div class="card-body">
+            <div class="verdict">Raining<br>now</div>
+            <div class="reading">8.5 mm · 1 km · ~9 mm·h⁻¹</div>
+            <div class="fig-advice flood-warn">Pooling likely at Hindmata. Wait it out.</div>
+          </div>
+          <div class="ticks"><span>40</span><span>20</span><span>0</span><span class="unit">mm</span></div>
+          <div class="cursor">51 dBZ</div>
+          <div class="card-foot">calibrated for your spot</div>
+          <div class="gauge"></div>
+        </div>
+        <figcaption class="fig-cap">Flood watch — radar red with a gold storm-light glint, water risen up the plate.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================== PLATE IX — VERDICT ANATOMY ===================== -->
+  <section id="sE" class="plate-sec dia">
+    <div class="plate-head">
+      <span class="plate-no">Plate IX</span>
+      <h2 class="plate-title">Verdict hero anatomy</h2>
+      <span class="plate-margin">four parts, one accent — DOM mapped to spec without guessing</span>
+    </div>
+    <p>The hero is the whole page. Four parts, one accent. This annotated view names each so a developer maps DOM to spec.</p>
+    <div class="diagram">
+      <svg viewBox="0 0 920 300" role="img" aria-label="Annotated verdict hero. Callouts point to the Marathi anchor at top-left, the huge verdict headline with an italic accent emphasis word, the mono reading line below it, and the leave-now action with an accent triangle marker.">
+        <rect x="40" y="36" width="470" height="228" rx="6" fill="#dde2dc" stroke="#a9b3ac"/>
+        <text x="66" y="78" class="t-mono" fill="#16221f" font-size="15" lang="mr">पाऊस</text>
+        <text x="66" y="140" class="t-disp" fill="#16221f" font-size="38">Rain in</text>
+        <text x="66" y="186" class="t-disp" fill="#2f7db0" font-size="38" font-style="italic">~40 min.</text>
+        <text x="66" y="214" class="t-mono" fill="#4a5853" font-size="14">~3 mm·h⁻¹</text>
+        <text x="66" y="248" fill="#16221f" font-size="14" font-style="italic"><tspan class="t-mono" fill="#2f7db0" font-weight="700" font-style="normal">▸ </tspan>Leave in the next ~15 min</text>
+        <g stroke="#4a5853" stroke-width="1" fill="none">
+          <path d="M118,72 H600" marker-end="url(#ah)"/>
+          <path d="M280,134 H600" marker-end="url(#ah)"/>
+          <path d="M250,210 H600" marker-end="url(#ah)"/>
+          <path d="M330,244 H600" marker-end="url(#ah)"/>
+        </g>
+        <g font-size="12" fill="#16221f">
+          <text x="612" y="76"><tspan class="t-mono" fill="#4a5853">.anchor</tspan> — पाऊस, constant (--ink, never recolours)</text>
+          <text x="612" y="138"><tspan class="t-mono" fill="#4a5853">#verdict</tspan> — Fraunces 900, emphasis word <tspan fill="#2f7db0">var(--accent)</tspan></text>
+          <text x="612" y="214"><tspan class="t-mono" fill="#4a5853">#verdict-sub</tspan> — mono, mm·h⁻¹ reading, tabular</text>
+          <text x="612" y="248"><tspan class="t-mono" fill="#4a5853">#leave</tspan> — imperative, ▸ marker in the accent</text>
+        </g>
+      </svg>
+      <p class="dia-cap"><b>Plate IX · Hero anatomy.</b> Anchor (identity) → verdict (the answer, the only thing carrying state colour) → reading (the measurement) → leave action (the decision). Everything but the verdict is whispered.</p>
+    </div>
+  </section>
+
+  <!-- ===================== PLATE X — STATES & LIVE DEMO ===================== -->
+  <section id="s7" class="plate-sec dia">
+    <div class="plate-head">
+      <span class="plate-no">Plate X</span>
+      <h2 class="plate-title">States &amp; live demo</h2>
+      <span class="plate-margin">colour = state, one accent at a time — live, and a full reference</span>
+    </div>
+
+    <h3><span class="h3-no">10.1</span>Try it — live state switcher (progressive enhancement)</h3>
+    <p>One real figure plate, driven by the controls below. Switching state changes the verdict, the <strong>single</strong> <code>--accent</code>, the leave action, the flood line, and the water height + tint + cursor read-off — all at once. <em>The plate is fully readable with JavaScript disabled (it renders the dry state); the controls only enhance it.</em></p>
+    <div class="demo-wrap">
+      <div>
+        <figure class="fig">
+          <div class="card live f-dry" id="demoCard" aria-live="polite">
+            <div class="card-top"><span id="demoFig">fig. — live</span><span class="loc">Hindmata</span></div>
+            <div class="card-body">
+              <div class="verdict" id="demoVerdict">Dry for<br>two hours</div>
+              <div class="reading" id="demoReading">0.0 mm · 2 km · clear</div>
+              <div class="fig-advice" id="demoAdvice">Go whenever. The sky holds.</div>
+            </div>
+            <div class="ticks"><span>40</span><span>20</span><span>0</span><span class="unit">mm</span></div>
+            <div class="cursor" id="demoCursor">0 mm</div>
+            <div class="card-foot">calibrated for your spot</div>
+            <div class="gauge" id="demoGauge" role="img" aria-label="Calm — no flooding"></div>
+          </div>
+          <figcaption class="fig-cap">live plate — driven by the controls →</figcaption>
+        </figure>
+      </div>
+      <div class="demo-controls">
+        <div class="seg" role="group" aria-label="Choose a state">
+          <button type="button" data-state="dry" aria-pressed="true">Dry</button>
+          <button type="button" data-state="incoming" aria-pressed="false">Rain coming</button>
+          <button type="button" data-state="now" aria-pressed="false">Raining now</button>
+          <button type="button" data-state="flood" aria-pressed="false">Flood</button>
+        </div>
+        <div class="slider-row">
+          <label for="floodSlider">Flood risk <span class="rv" id="floodVal">0%</span></label>
+          <input type="range" min="0" max="100" value="0" step="1" class="flood-slider" id="floodSlider" aria-describedby="floodLevelTxt">
+          <div class="demo-hint" id="floodLevelTxt">Slide to feel the rising water — level → height on the gauge → colour.</div>
+        </div>
+        <div class="demo-readout" id="demoReadout">
+          state <b>dry</b> · accent <span class="ac" id="roAccent">#5a8f86</span> ·
+          gauge <b id="roWater">10px</b> · flood <b id="roFlood">low</b>
+        </div>
+      </div>
+    </div>
+    <div class="note"><span class="note-k">What to watch</span>Only one accent is ever lit. Red appears <em>only</em> for genuine flood risk (the flood line + risen water + a single gold glint) — never as the verdict accent. Drag the slider past the thresholds and the water tints and climbs the ruler, the cursor tracking the read-off.</div>
+
+    <h3><span class="h3-no">10.2</span>State reference</h3>
+    <div class="note"><span class="note-k">State class contract</span><code>#app</code> carries exactly one class: <code>state-loading | state-dry | state-incoming | state-now | state-flood | state-error</code>. CSS keys all visual state off this class (and the JS-set <code>--accent</code>). Flood risk layers on top of <code>state-now</code>/<code>state-incoming</code> via the flood row + water tint.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>State</th><th>Shows</th><th>Accent</th><th>Verdict copy</th><th>Reading copy</th><th>Water</th></tr></thead>
+      <tbody>
+        <tr><td><code>state-loading</code></td><td>anchor, pill (default), placeholder, footer, thin water</td><td><code>--radar-dry</code></td><td>Reading the sky…</td><td>—</td><td>thin base line</td></tr>
+        <tr><td><code>state-dry</code></td><td>anchor, pill, verdict, footer, thin calm water. <strong>No</strong> leave / flood</td><td><code>--radar-dry</code></td><td>Dry for the next 2h</td><td>Go — no rain at your spot</td><td>thin, still</td></tr>
+        <tr><td><code>state-incoming</code></td><td>+ leave action, measured row; flood if risky; climbing water</td><td><code>--radar-rain</code></td><td>Rain in ~{N} min</td><td>peaking ~{mm} mm·h⁻¹</td><td>~12–15%, ripple</td></tr>
+        <tr><td><code>state-now</code></td><td>verdict, measured row, footer; flood if risky; swelling water. <strong>No</strong> leave</td><td><code>--radar-now</code> by intensity</td><td>Raining now</td><td>~{mm} mm·h⁻¹ overhead</td><td>~18–22%, swell</td></tr>
+        <tr><td>flood (layered)</td><td>adds flood line; water rises, tints red + gold glint</td><td>verdict keeps its rain/now accent; <strong>red reserved for flood</strong></td><td>(unchanged)</td><td>(unchanged)</td><td>watch ~22% / high ~30%, red</td></tr>
+      </tbody>
+    </table></div>
+    <h3><span class="h3-no">10.3</span>Error &amp; edge states</h3>
+    <p>All errors are kind, specific, and offer the next action. They never apologise or go vague. Water drops to the thin calm line; accent → <code>--ink-soft</code> (neutral, "no live reading"); leave action + flood line hidden.</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>State</th><th>Trigger</th><th><code>#app</code> class</th><th>Verdict</th><th>Reading</th><th>Recovery</th></tr></thead>
+      <tbody>
+        <tr><td>Geo denied</td><td>user blocks / no geolocation</td><td><code>state-dry</code> (default locality)</td><td>(normal verdict)</td><td>normal</td><td>Pill works; one-time hint "Showing {Area} — tap to change"</td></tr>
+        <tr><td>Fetch failed</td><td>Open-Meteo non-OK / network</td><td><code>state-error</code></td><td>Can't reach the forecast</td><td>Check your connection, then tap your area to retry.</td><td>Re-select any locality re-runs render()</td></tr>
+        <tr><td>No data</td><td>API OK, no usable hours</td><td><code>state-error</code></td><td>No reading right now</td><td>Open-Meteo has no data for this spot yet. Try another area.</td><td>Pill to switch area</td></tr>
+        <tr><td>Offline</td><td><code>navigator.onLine===false</code></td><td><code>state-error</code></td><td>You're offline</td><td>Reconnect, then tap your area to retry.</td><td><code>online</code> event re-runs render()</td></tr>
+        <tr><td>App-data fail</td><td>zones/localities/model fetch fails</td><td><code>state-error</code></td><td>Couldn't load the app</td><td>Refresh the page to try again.</td><td>full reload</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ===================== PLATE XI — STATE MACHINE ===================== -->
+  <section id="sB" class="plate-sec dia">
+    <div class="plate-head">
+      <span class="plate-no">Plate XI</span>
+      <h2 class="plate-title">Verdict state machine</h2>
+      <span class="plate-margin">real <code>nowcast.js</code> thresholds; flood is an overlay, not a peer</span>
+    </div>
+    <p>How the verdict moves between states, with the real <code>nowcast.js</code> thresholds on the arrows: rain counts when corrected intensity crosses <code>RAIN_THRESHOLD_MM = 0.3 mm/h</code> within the <code>HORIZON_HRS = 2</code> window; <code>startsInHrs = 0</code> means it's raining this hour. <strong>Flood is an overlay</strong>, not a peer state — it layers on top of <em>rain coming</em> or <em>raining now</em>, driven by flood risk (peak mm/h × zone severity). The active node tracks the live demo above.</p>
+    <div class="diagram">
+      <svg viewBox="0 0 920 340" role="img" aria-label="State machine. Dry transitions to Rain-coming when forecast peak is at or above 0.3 millimetres per hour within two hours. Rain-coming transitions to Raining-now when startsInHrs equals zero. Raining-now returns toward Dry when peak drops below 0.3. Flood is an overlay on the rain states, triggered when peak times zone severity reaches the watch or high threshold.">
+        <defs><marker id="ah2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#4a5853"/></marker></defs>
+        <path class="arrow lit" d="M196,120 H342" fill="none" stroke="#2f7db0" stroke-width="2.5" marker-end="url(#ah2)"/>
+        <text x="270" y="108" text-anchor="middle" class="t-mono" fill="#2f7db0" font-size="11">peak ≥ 0.3 mm/h</text>
+        <path class="arrow lit" d="M498,120 H644" fill="none" stroke="#d98a2b" stroke-width="2.5" marker-end="url(#ah2)"/>
+        <text x="570" y="108" text-anchor="middle" class="t-mono" fill="#d98a2b" font-size="11">startsInHrs = 0</text>
+        <path class="arrow" d="M644,150 C470,232 320,232 196,152" fill="none" stroke="#4a5853" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#ah2)"/>
+        <text x="420" y="236" text-anchor="middle" class="t-mono" fill="#4a5853" font-size="11">peak &lt; 0.3 mm/h (window clears)</text>
+        <g class="node" id="nodeDry" data-state="dry">
+          <circle class="ring" cx="120" cy="120" r="34" fill="none" stroke="#5a8f86" opacity="0.2"/>
+          <circle cx="120" cy="120" r="46" fill="#d3d9d2" stroke="#5a8f86"/>
+          <text x="120" y="116" text-anchor="middle" fill="#16221f" font-size="13" font-weight="700">Dry</text>
+          <text x="120" y="132" text-anchor="middle" class="t-mono" fill="#4a5853" font-size="9">--radar-dry</text>
+        </g>
+        <g class="node" id="nodeIncoming" data-state="incoming">
+          <circle class="ring" cx="420" cy="120" r="34" fill="none" stroke="#2f7db0" opacity="0.2"/>
+          <circle cx="420" cy="120" r="46" fill="#d3d9d2" stroke="#2f7db0"/>
+          <text x="420" y="116" text-anchor="middle" fill="#16221f" font-size="12" font-weight="700">Rain coming</text>
+          <text x="420" y="132" text-anchor="middle" class="t-mono" fill="#4a5853" font-size="9">--radar-rain</text>
+        </g>
+        <g class="node" id="nodeNow" data-state="now">
+          <circle class="ring" cx="720" cy="120" r="34" fill="none" stroke="#d98a2b" opacity="0.2"/>
+          <circle cx="720" cy="120" r="46" fill="#d3d9d2" stroke="#d98a2b"/>
+          <text x="720" y="116" text-anchor="middle" fill="#16221f" font-size="12" font-weight="700">Raining now</text>
+          <text x="720" y="132" text-anchor="middle" class="t-mono" fill="#4a5853" font-size="9">--radar-now</text>
+        </g>
+        <rect x="330" y="246" width="480" height="74" rx="4" fill="none" stroke="#c0392b" stroke-dasharray="6 5"/>
+        <text x="350" y="272" fill="#c0392b" font-size="12" font-weight="700">Flood — overlay on the rain states</text>
+        <text x="350" y="292" class="t-mono" fill="#16221f" font-size="10.5">peak × zoneSeverity ≥ 4 → watch · ≥ 12 → high</text>
+        <text x="350" y="309" fill="#4a5853" font-size="10">adds the flood line; water tints red &amp; rises. Verdict keeps its rain/now accent.</text>
+        <path class="arrow" d="M560,200 V246" fill="none" stroke="#c0392b" stroke-width="1.6" stroke-dasharray="4 4" marker-end="url(#ah2)"/>
+        <path d="M420,166 V200 H720 V166" fill="none" stroke="#a9b3ac" stroke-width="1"/>
+      </svg>
+      <p class="dia-cap"><b>Plate XI · State machine.</b> Three linear verdict states with the live <code>nowcast.js</code> thresholds; flood is a red overlay on the two rain states, never a verdict accent. The lit node mirrors the demo switcher in Plate X.</p>
+    </div>
+  </section>
+
+  <!-- ===================== PLATE XII — RISING-WATER MECHANISM ===================== -->
+  <section id="sC" class="plate-sec dia">
+    <div class="plate-head">
+      <span class="plate-no">Plate XII</span>
+      <h2 class="plate-title">Rising-water mechanism</h2>
+      <span class="plate-margin">the signature, decoded — risk drives height, colour &amp; the cursor read-off</span>
+    </div>
+    <p>The signature element, decoded: flood risk level drives the water's <strong>height</strong>, <strong>colour</strong>, and the <strong>cursor value</strong> read off the ruler. <code>water.setLevel(state, floodLevel, peakMm)</code> maps risk to a target height percentage and a tint off the radar ramp — flood risk first, rain intensity second. The bar below is live: drag the Plate X flood slider and the marker tracks it.</p>
+    <div class="diagram">
+      <svg viewBox="0 0 920 250" role="img" aria-label="Rising-water mechanism. As flood risk rises from low to watch to high, water height climbs from a thin base line to roughly thirty percent of the viewport, and the tint shifts from sea-glass through blue to red.">
+        <defs>
+          <linearGradient id="waterRamp" x1="0" x2="1">
+            <stop offset="0" stop-color="#5a8f86"/><stop offset="0.35" stop-color="#2f7db0"/>
+            <stop offset="0.6" stop-color="#d98a2b"/><stop offset="1" stop-color="#c0392b"/>
+          </linearGradient>
+        </defs>
+        <text x="20" y="26" class="t-lbl" fill="#4a5853" font-size="12">flood risk → water height → colour</text>
+        <rect x="20" y="44" width="700" height="20" fill="url(#waterRamp)" stroke="#16221f"/>
+        <g font-size="10.5" fill="#16221f">
+          <text x="60" y="92">low</text><text x="60" y="106" class="t-mono" fill="#4a5853" font-size="9">base line</text>
+          <text x="330" y="92">watch</text><text x="330" y="106" class="t-mono" fill="#4a5853" font-size="9">~22%</text>
+          <text x="600" y="92">high</text><text x="600" y="106" class="t-mono" fill="#4a5853" font-size="9">~30%</text>
+        </g>
+        <line x1="300" y1="40" x2="300" y2="68" stroke="#16221f" stroke-width="1.5"/>
+        <line x1="560" y1="40" x2="560" y2="68" stroke="#16221f" stroke-width="1.5"/>
+        <g id="waterMarker" transform="translate(20,0)">
+          <path d="M0,32 L-7,20 L7,20 Z" fill="#16221f"/>
+          <line x1="0" y1="32" x2="0" y2="70" stroke="#16221f" stroke-width="2"/>
+        </g>
+        <rect x="760" y="40" width="130" height="180" rx="6" fill="#dde2dc" stroke="#16221f"/>
+        <g class="swell"><rect id="waterFill" x="761" y="160" width="128" height="59" fill="#2f7db0" opacity="0.32"/>
+        <rect id="waterFillEdge" x="761" y="160" width="128" height="2" fill="#2f7db0" opacity="0.7"/></g>
+        <text x="825" y="236" text-anchor="middle" class="t-mono" fill="#4a5853" font-size="9" id="waterPct">~22% height</text>
+      </svg>
+      <p class="dia-cap"><b>Plate XII · Rising water.</b> Risk maps to height and tint; the mini-plate fills to match and swells gently (ambient). Live — controlled by the Plate X flood slider.</p>
+    </div>
+  </section>
+
+  <!-- ===================== PLATE XIII — NEXT 120 MIN + TIDE ===================== -->
+  <section id="sT" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate XIII</span>
+      <h2 class="plate-title">The next 120 minutes &amp; the tide</h2>
+      <span class="plate-margin">tide depth is the documented competitive edge — give it a plate</span>
+    </div>
+    <p>An optional secondary plate under the verdict: a compact <strong>NEXT-120-MIN</strong> coloured-bar timeline (each bar an upcoming 10-min slice, height + colour off the same radar ramp) and a <strong>tide bar</strong> showing the next high-tide level against the flood-risk threshold. Tide depth is a documented edge for this product (Mumbai floods when heavy rain meets a high tide that won't let the drains empty), so it earns its own engraved reading — not buried in a tooltip.</p>
+    <div class="timeline" role="img" aria-label="Next 120 minutes: rain rises from light at 0 to 20 minutes, peaks heavy around 40 to 70 minutes, then eases. High tide at 1.1 metres around 50 minutes sits just above the flood-risk mark.">
+      <div class="tl-head"><span>Next 120 min · <b>10-min slices</b></span><span>rate · <b>mm·h⁻¹</b>, colour off the radar ramp</span></div>
+      <div class="tl-track">
+        <div class="tl-bar"><i style="height:8%;background:#5a8f86"></i></div>
+        <div class="tl-bar"><i style="height:14%;background:#5a8f86"></i></div>
+        <div class="tl-bar"><i style="height:30%;background:#2f7db0"></i></div>
+        <div class="tl-bar"><i style="height:46%;background:#2f7db0"></i></div>
+        <div class="tl-bar"><i style="height:62%;background:#2f7db0"></i></div>
+        <div class="tl-bar"><i style="height:80%;background:#d98a2b"></i></div>
+        <div class="tl-bar"><i style="height:96%;background:#c0392b"></i></div>
+        <div class="tl-bar"><i style="height:88%;background:#d98a2b"></i></div>
+        <div class="tl-bar"><i style="height:64%;background:#2f7db0"></i></div>
+        <div class="tl-bar"><i style="height:42%;background:#2f7db0"></i></div>
+        <div class="tl-bar"><i style="height:22%;background:#5a8f86"></i></div>
+        <div class="tl-bar"><i style="height:12%;background:#5a8f86"></i></div>
+      </div>
+      <div class="tl-axis"><span>now</span><span>+30</span><span>+60</span><span>+90</span><span>+120 min</span></div>
+      <div class="tide">
+        <div class="tide-lbl"><span>High tide · next window</span><span><b>1.1 m</b> @ +50 min · flood mark 0.9 m</span></div>
+        <div class="tide-track"><div class="tide-fill" style="width:73%"></div><div class="tide-mark" style="left:60%"></div></div>
+      </div>
+      <p class="tl-note">The peak rain band (around +40–70 min) lands while the tide sits above the flood mark — the moment Mumbai actually floods. This plate makes that coincidence legible at a glance.</p>
+    </div>
+    <div class="note"><span class="note-k">Build note</span>Bars are CSS-height divs coloured off the radar ramp tokens; the tide fill and the flood mark are absolutely-positioned within a track. Both are <strong>fully visible without JS</strong> (static example values shown here). When live, one render pass writes bar heights from the 10-min nowcast slices and the tide values from the tide API.</div>
+  </section>
+
+  <!-- ===================== PLATE XIV — MOTION ===================== -->
+  <section id="s8" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate XIV</span>
+      <h2 class="plate-title">Motion</h2>
+      <span class="plate-margin">restrained; reduced-motion is the default, animation an enhancement</span>
+    </div>
+    <p>Restrained and orchestrated. One page-load moment; ambient water swell; clean cross-fades. Every animation has a <code>prefers-reduced-motion</code> fallback. Gate all non-essential animation behind <code>@media (prefers-reduced-motion: no-preference)</code> — treat the reduced-motion path as the <em>default</em>. No bouncing, no particles, no falling rain. <strong>Critically: no animation ever hides content</strong> — there are zero <code>opacity:0</code> + JS-reveal traps; content is visible whether or not any script or transition runs.</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Moment</th><th>What happens</th><th>Duration / easing</th><th>Reduced-motion fallback</th></tr></thead>
+      <tbody>
+        <tr><td>Page load</td><td>Verdict + reading are present immediately; accent settles</td><td class="num">~600ms, cubic-bezier(.2,.7,.2,1)</td><td>Final value instantly, no count-up</td></tr>
+        <tr><td>Water settle</td><td>Water rises from base to state height on the gauge</td><td class="num">~700ms, ease-out</td><td>Snaps to final height</td></tr>
+        <tr><td>Water ambient</td><td>Slow surface swell, 6–7s loop, low amplitude</td><td class="num">ease-in-out alternate</td><td><strong>No animation</strong> — static at state height</td></tr>
+        <tr><td>State cross-fade</td><td>Verdict colour + text swap; water height/tint/cursor tween</td><td class="num">~400ms accent, ~600ms height</td><td>Instant swap</td></tr>
+        <tr><td>Storm-light glint</td><td>Warm gold gradient on the flood-state fill only (static)</td><td class="num">static gradient</td><td>Unchanged (no motion involved)</td></tr>
+        <tr><td>Focus</td><td>Outline appears (no motion)</td><td class="num">—</td><td>Unchanged (always on)</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ===================== PLATE XV — RESPONSIVE ===================== -->
+  <section id="s9" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate XV</span>
+      <h2 class="plate-title">Responsive</h2>
+      <span class="plate-margin">the phone column is canonical; bigger screens frame it</span>
+    </div>
+    <p>Mobile-first, readable to 360px. The phone column is canonical; larger screens frame it rather than re-flow it.</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Breakpoint</th><th>Width</th><th>Treatment</th></tr></thead>
+      <tbody>
+        <tr><td>Small phone</td><td class="num">360–480px</td><td>Single column, side padding <code>--s-5</code>, verdict at the small end of its clamp. Must work at 360px with no horizontal scroll, one-handed reach.</td></tr>
+        <tr><td>Large phone</td><td class="num">480–768px</td><td>Same column at <code>min(92vw,30rem)</code>; verdict grows via clamp; more breathing room.</td></tr>
+        <tr><td>Tablet</td><td class="num">768–1024px</td><td>Column stays <code>≤30rem</code>, centred. Water spans the <strong>full viewport width</strong> (it's the field). Figure plates go three-across in this doc, one-up under 760px.</td></tr>
+        <tr><td>Desktop</td><td class="num">≥1024px</td><td>Same centred column. Optional <strong>phone frame</strong>: <code>≤30rem</code> column gets a border on the field. Water <strong>fills the whole window</strong> behind it.</td></tr>
+      </tbody>
+    </table></div>
+    <p>What never changes: single column, left-aligned verdict, one accent, water anchored to the bottom read off the gauge, big touch targets.</p>
+  </section>
+
+  <!-- ===================== PLATE XVI — ACCESSIBILITY ===================== -->
+  <section id="s10" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate XVI</span>
+      <h2 class="plate-title">Accessibility</h2>
+      <span class="plate-margin">quality floor, non-negotiable, never announced in the UI</span>
+    </div>
+    <h3><span class="h3-no">16.1</span>Contrast (WCAG AA — ≥4.5:1 body / ≥3:1 large text)</h3>
+    <p>The almanac is light-on-light only where it's safe; all load-bearing text is storm-ink on wet newsprint. Radar accents are used on large text (the verdict) where the 3:1 threshold applies.</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Pair</th><th>Ratio</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><code>--ink</code> on <code>--paper</code></td><td class="num">~12:1</td><td>pass (body)</td></tr>
+        <tr><td><code>--ink-soft</code> on <code>--paper</code></td><td class="num">~5.0:1</td><td>pass (body, labels)</td></tr>
+        <tr><td><code>--radar-rain</code> on <code>--paper</code> (verdict, large)</td><td class="num">~4.0:1</td><td>pass (large text ≥3:1)</td></tr>
+        <tr><td><code>--radar-now</code> on <code>--paper</code> (verdict, large)</td><td class="num">~3.3:1</td><td>pass (large only) — never small</td></tr>
+        <tr><td><code>--radar-flood</code> on <code>--paper</code> (flood line)</td><td class="num">~4.6:1</td><td>pass — flood line is italic; fine</td></tr>
+        <tr><td><code>--radar-dry</code> on <code>--paper</code> (verdict, large)</td><td class="num">~3.0:1</td><td>large only; pair with the verdict's size/weight</td></tr>
+      </tbody>
+    </table></div>
+    <h3><span class="h3-no">16.2</span>Focus · targets · screen reader · reduced motion</h3>
+    <ul>
+      <li><strong>Focus.</strong> Every interactive element shows <code>outline: 2px solid var(--ink); outline-offset: 2px</code>. Never remove without an equally visible replacement. Order: pill → scoreboard link → Open-Meteo link.</li>
+      <li><strong>Touch targets.</strong> Pill and links ≥ 44×44px hit area.</li>
+      <li><strong>Verdict announcement.</strong> <code>#app</code> has <code>aria-live="polite"</code>; announce a single coherent string per render ("Rain in about forty minutes, peaking about 3 millimetres per hour"). Don't repeatedly announce the loading placeholder.</li>
+      <li><strong>The water (<code>#water</code>).</strong> <code>role="img"</code> + an <code>aria-label</code> describing the level in words, updated on every <code>setLevel</code> (see Plate XVII SR-label rows).</li>
+      <li><strong>Marathi anchor.</strong> <code>lang="mr"</code>, not hidden — reads as "पाऊस / rain".</li>
+      <li><strong>Pill.</strong> <code>&lt;select&gt;</code> keeps <code>aria-label="Choose your Mumbai area"</code>.</li>
+      <li><strong>Reduced motion.</strong> Respected per Plate XIV — water becomes one static line at state height, no swell, no count-up.</li>
+      <li><strong>No JS-gated content.</strong> Every section renders fully with JavaScript disabled. The live demo is the only interactive element, and it ships pre-rendered in the dry state, so disabling JS loses the controls but never the content.</li>
+    </ul>
+  </section>
+
+  <!-- ===================== PLATE XVII — MICROCOPY ===================== -->
+  <section id="s11" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate XVII</span>
+      <h2 class="plate-title">Microcopy &amp; voice</h2>
+      <span class="plate-margin">a weather-diary voice — active, plain, Mumbai-tuned, honest</span>
+    </div>
+    <p><strong>Principles.</strong> (1) <em>Active, decision-first</em> — a verb to act on ("Go", "Leave in the next fifteen minutes"), not "Conditions are favourable". (2) <em>Plain, sentence case</em> — no title case, no jargon, no exclamation marks. (3) <em>Mumbai-tuned &amp; honest</em> — name real spots; separate <em>measured now</em> from <em>forecast</em>. (4) <em>Errors direct, never apologetic</em> — what happened + the next action; no "Oops", no "Sorry". (5) <em>Consistent vocabulary</em> — "your spot", "area", "measured now", "leave", "rain" reused everywhere.</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Location</th><th>State / context</th><th>Exact copy</th></tr></thead>
+      <tbody>
+        <tr><td>Anchor</td><td>all</td><td class="mono" lang="mr">पाऊस</td></tr>
+        <tr><td>Pill</td><td>resolved</td><td>📍 {Area} ▾</td></tr>
+        <tr><td>Pill</td><td>denied-geo hint (one-time)</td><td>Showing {Area} — tap to change your area</td></tr>
+        <tr><td>Verdict</td><td>loading</td><td>Reading the sky…</td></tr>
+        <tr><td>Verdict</td><td>dry</td><td>Dry for the next 2h</td></tr>
+        <tr><td>Reading</td><td>dry</td><td>Go — no rain at your spot</td></tr>
+        <tr><td>Verdict</td><td>rain coming (&lt;60m)</td><td>Rain in about ~{N} min</td></tr>
+        <tr><td>Verdict</td><td>rain coming (≥60m)</td><td>Rain in about ~{N}h</td></tr>
+        <tr><td>Reading</td><td>rain coming</td><td>peaking ~{mm} mm·h⁻¹</td></tr>
+        <tr><td>Leave action</td><td>rain coming</td><td>▸ Leave in the next ~{mins} min to stay dry</td></tr>
+        <tr><td>Verdict</td><td>raining now</td><td>Raining now</td></tr>
+        <tr><td>Reading</td><td>raining now</td><td>~{mm} mm·h⁻¹ overhead</td></tr>
+        <tr><td>Row label</td><td>all</td><td>measured now <span class="mono">(UPPERCASE via CSS)</span></td></tr>
+        <tr><td>Row value</td><td>all</td><td>{mm} mm · {km} km <span class="mono">(omit "· {km} km" if unknown)</span></td></tr>
+        <tr><td>Flood line</td><td>watch</td><td>⚠ Rain building over {Spot}</td></tr>
+        <tr><td>Flood line</td><td>high</td><td>⚠ {Spot} pooling likely</td></tr>
+        <tr><td>Footer line 1</td><td>all</td><td>calibrated forecast for your spot · model v{N}</td></tr>
+        <tr><td>Footer line 2</td><td>all (required)</td><td>Weather data by Open-Meteo.com <span class="mono">(linked)</span></td></tr>
+        <tr><td>Verdict</td><td>fetch failed</td><td>Can't reach the forecast</td></tr>
+        <tr><td>Reading</td><td>fetch failed</td><td>Check your connection, then tap your area to retry.</td></tr>
+        <tr><td>Verdict</td><td>no data</td><td>No reading right now</td></tr>
+        <tr><td>Reading</td><td>no data</td><td>Open-Meteo has no data for this spot yet. Try another area.</td></tr>
+        <tr><td>Verdict</td><td>offline</td><td>You're offline</td></tr>
+        <tr><td>Reading</td><td>offline</td><td>Reconnect, then tap your area to retry.</td></tr>
+        <tr><td>Verdict</td><td>app-data load fail</td><td>Couldn't load the app</td></tr>
+        <tr><td>Reading</td><td>app-data load fail</td><td>Refresh the page to try again.</td></tr>
+        <tr><td>Water (SR label)</td><td>dry</td><td>Calm — no flooding</td></tr>
+        <tr><td>Water (SR label)</td><td>rain</td><td>Water level low</td></tr>
+        <tr><td>Water (SR label)</td><td>flood watch</td><td>Flood risk — water building</td></tr>
+        <tr><td>Water (SR label)</td><td>flood high</td><td>Flood risk high — water rising</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ===================== PLATE XVIII — HANDOFF ===================== -->
+  <section id="s12" class="plate-sec">
+    <div class="plate-head">
+      <span class="plate-no">Plate XVIII</span>
+      <h2 class="plate-title">Build handoff checklist</h2>
+      <span class="plate-margin">definition of done, quality floor, and the migration map</span>
+    </div>
+    <h3><span class="h3-no">18.1</span>Definition of done</h3>
+    <ul>
+      <li>Open on a phone (360px+) → within <strong>2 seconds</strong> a clear, recoloured verdict for the user's location, with a pill to change area.</li>
+      <li>All states (Plate X) render with exact copy + accent, including every error state.</li>
+      <li>Rising water rises/tints per state, with the cursor read-off, degrading to one static line under <code>prefers-reduced-motion</code>.</li>
+      <li>Total page weight <strong>&lt; 100KB</strong> (font request limited to the listed families/weights — note Fraunces, Newsreader, Plex Mono and Tiro Devanagari are this doc's faces; the <em>app</em> may subset further to protect budget).</li>
+      <li>No horizontal scroll at 360px · AA contrast · visible focus · reduced-motion respected.</li>
+      <li>Required Open-Meteo attribution present and linked.</li>
+    </ul>
+    <h3><span class="h3-no">18.2</span>Quality floor (silent, non-negotiable)</h3>
+    <p>Responsive to 360px · visible keyboard focus rings · contrast ≥4.5:1 text (≥3:1 large) · reduced-motion respected · 44px touch targets · one-handed reach · no spinner that never resolves · no layout shift on state change (reserve space for leave action / flood line, toggle visibility, don't reflow the hero) · <strong>content visible without JS</strong>.</p>
+    <h3><span class="h3-no">18.3</span>Asset list</h3>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Asset</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>Fonts</td><td>Google Fonts, one combined request: <code class="mono">family=Fraunces:opsz,ital,wght@9..144,0,600;9..144,0,900;9..144,1,600&amp;family=Newsreader:ital,opsz@1,18&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Tiro+Devanagari+Marathi&amp;display=swap</code>, with <code>preconnect</code>.</td></tr>
+        <tr><td>Icons</td><td>Unicode only: 📍 ▾ ▸ ⚠. No icon font, no SVG sprite.</td></tr>
+        <tr><td>Data</td><td><code>data/localities.json</code>, <code>data/flood-zones.json</code>, <code>model.json</code> — already in <code>web/</code>.</td></tr>
+        <tr><td>Live API</td><td>Open-Meteo (<code>api.open-meteo.com/v1/forecast</code>), keyless, CORS-enabled. Tide via the marine endpoint for Plate XIII.</td></tr>
+      </tbody>
+    </table></div>
+    <h3><span class="h3-no">18.4</span>Map to existing <code>web/</code> files</h3>
+    <p>The logic layer is correct and stays; the <strong>visual layer must be migrated</strong> to this almanac spec.</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>File</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><code>web/nowcast.js</code></td><td><strong>Keep as-is</strong></td><td><code>verdict()</code>, <code>predict()</code>, <code>rowFeatures()</code> are the logic contract. Do not touch.</td></tr>
+        <tr><td><code>web/flood.js</code></td><td><strong>Keep as-is</strong></td><td><code>nearestZone()</code>, <code>floodRisk()</code> ({level, reason}) are the contract. Do not touch.</td></tr>
+        <tr><td><code>web/model.json</code></td><td><strong>Keep as-is</strong></td><td>Schema/seed unchanged. Footer shows <code>model.version</code>.</td></tr>
+        <tr><td><code>web/data/*.json</code></td><td><strong>Keep as-is</strong></td><td>Localities + flood zones.</td></tr>
+        <tr><td><code>web/index.html</code></td><td><strong>Update</strong></td><td>Swap font link to the four almanac faces. <code>theme-color</code> → <code>#dde2dc</code>. Set the <code lang="mr">पाऊस</code> anchor in the masthead (<code>lang="mr"</code>). Replace <code>&lt;canvas id="rain"&gt;</code> with <code>&lt;div id="water" role="img"&gt;</code> + the engraved gauge ruler. Keep DOM IDs <code>#app #locality #verdict #verdict-sub #leave #measured #flood-row #flood #honesty</code>.</td></tr>
+        <tr><td><code>web/style.css</code></td><td><strong>Rewrite</strong></td><td>Replace the old system with the tokens (Plate IV), type (Plate VI), layout (Plate VII), components (Plate VIII), state classes (Plate X), motion (Plate XIV), responsive (Plate XV), a11y (Plate XVI). Define <code>:root</code> exactly as Plate IV.</td></tr>
+        <tr><td><code>web/app.js</code></td><td><strong>Update rendering only</strong></td><td>Keep fetch/shape/verdict/flood wiring + the <code>reqToken</code> guard + geolocation. <strong>Replace the falling-rain IIFE with a <code>water.setLevel(state, floodLevel, peakMm)</code> controller</strong> driving <code>#water</code> + the gauge cursor. In <code>renderVerdict</code>, compute/set <code>--accent</code> (incl. the raining-now blend 8.3) and update the water + its <code>aria-label</code>. Add the error/offline/no-data branches (Plate X) + an <code>online</code> re-render listener.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note"><span class="note-k">One thing to remove (Chanel's rule)</span>The current <code>app.js</code> falling-rain canvas is the "extra accessory". Cut it. The rising water read off the gauge is the single signature; falling rain is exactly the generic weather-app effect this almanac rejects.</div>
+  </section>
+
+  <div class="footer-doc">
+    पाऊस · The Mumbai Monsoon Almanac · frontend-design-doc · build from Plate IV down, verify against Plate XVIII.1 · this document is rendered in the system it specifies · readings by Open-Meteo.
+  </div>
+</div>
+
+<div class="copied-toast" id="copyToast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+  var RM = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- copyable swatches (enhancement only; content already visible) ---------- */
+  var toast = document.getElementById("copyToast"), toastT;
+  function showToast(msg){
+    if(!toast) return;
+    toast.textContent = msg; toast.classList.add("show");
+    clearTimeout(toastT); toastT = setTimeout(function(){ toast.classList.remove("show"); }, 1400);
+  }
+  function copyHex(hex){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(hex).then(function(){ showToast("Copied " + hex); }, function(){ showToast(hex); });
+    } else { showToast(hex); }
+  }
+  document.querySelectorAll(".sw .chip").forEach(function(chip){
+    var hex = (chip.getAttribute("data-hex") || "").trim();
+    if(!hex) return;
+    chip.setAttribute("tabindex","0");
+    chip.setAttribute("role","button");
+    chip.setAttribute("aria-label","Copy " + hex);
+    chip.addEventListener("click", function(){ copyHex(hex); });
+    chip.addEventListener("keydown", function(e){
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); copyHex(hex); }
+    });
+  });
+
+  /* ---------- live demo: state switcher + flood slider (progressive enhancement) ---------- */
+  var card    = document.getElementById("demoCard");
+  if(!card){ return; }
+  var vEl     = document.getElementById("demoVerdict");
+  var readEl  = document.getElementById("demoReading");
+  var advEl   = document.getElementById("demoAdvice");
+  var figEl   = document.getElementById("demoFig");
+  var curEl   = document.getElementById("demoCursor");
+  var gaugeEl = document.getElementById("demoGauge");
+  var slider  = document.getElementById("floodSlider");
+  var floodVal= document.getElementById("floodVal");
+  var floodLvlTxt = document.getElementById("floodLevelTxt");
+  var segBtns = document.querySelectorAll(".seg [data-state]");
+  var roAccent= document.getElementById("roAccent");
+  var roWater = document.getElementById("roWater");
+  var roFlood = document.getElementById("roFlood");
+  // mechanism diagram (Plate XII)
+  var marker  = document.getElementById("waterMarker");
+  var wFill   = document.getElementById("waterFill");
+  var wFillEdge = document.getElementById("waterFillEdge");
+  var wPct    = document.getElementById("waterPct");
+  // state-machine nodes (Plate XI)
+  var nodes   = { dry:document.getElementById("nodeDry"), incoming:document.getElementById("nodeIncoming"), now:document.getElementById("nodeNow") };
+
+  var ACCENTS = { dry:"#5a8f86", incoming:"#2f7db0", now:"#d98a2b", flood:"#c0392b" };
+  var STATES = {
+    dry:      { cls:"f-dry",   accent:"#5a8f86", fig:"fig. — clear",       verdict:"Dry for<br>two hours",  read:"0.0 mm · 2 km · clear",         adv:"Go whenever. The sky holds.",            advFlood:false, cur:"0 mm" },
+    incoming: { cls:"f-rain",  accent:"#2f7db0", fig:"fig. — incoming",    verdict:"Rain in<br>~40 min",    read:"0.2 mm · 3 km · ~3 mm·h⁻¹",     adv:"Leave within 15 min to stay dry.",        advFlood:false, cur:"23 dBZ" },
+    now:      { cls:"f-rain",  accent:"#d98a2b", fig:"fig. — raining now", verdict:"Raining<br>now",        read:"8.5 mm · 1 km · ~9 mm·h⁻¹",     adv:"Heavy overhead. Wait if you can.",        advFlood:false, cur:"42 dBZ" },
+    flood:    { cls:"f-flood", accent:"#d98a2b", fig:"fig. — flood watch", verdict:"Raining<br>now",        read:"13.0 mm · 1 km · ~14 mm·h⁻¹",   adv:"Pooling likely at Hindmata. Wait it out.",advFlood:true,  cur:"54 dBZ" }
+  };
+  var current = "dry";
+
+  function floodLevel(pct){ if(pct >= 66) return "high"; if(pct >= 22) return "watch"; return "low"; }
+  function heightPct(pct){ return Math.round(2 + (pct/100)*36); } // ~2%..38%
+
+  function applyState(state){
+    current = state;
+    var s = STATES[state];
+    // swap the per-weather class (controls gauge height/colour + glint)
+    card.classList.remove("f-dry","f-rain","f-flood");
+    card.classList.add(s.cls);
+    card.style.setProperty("--accent", s.accent);
+    vEl.innerHTML = s.verdict;
+    readEl.textContent = s.read;
+    advEl.textContent = s.adv;
+    advEl.classList.toggle("flood-warn", s.advFlood);
+    figEl.textContent = s.fig;
+    curEl.textContent = s.cur;
+    var preset = { dry:0, incoming:18, now:48, flood:82 }[state];
+    slider.value = preset;
+    segBtns.forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.state === state ? "true" : "false"); });
+    var nodeKey = (state === "flood") ? "now" : state;
+    Object.keys(nodes).forEach(function(k){ if(nodes[k]) nodes[k].classList.toggle("active", k === nodeKey); });
+    roAccent.textContent = s.accent;
+    applyFlood(+slider.value);
+  }
+
+  function applyFlood(pct){
+    floodVal.textContent = pct + "%";
+    var lvl = floodLevel(pct);
+    var hPct = heightPct(pct);
+    // demo gauge: set explicit height in px (card is ~430px tall)
+    var gPx = Math.max(10, Math.round(430 * hPct/100));
+    if(pct === 0 && current === "dry") gPx = 10;
+    if(gaugeEl){ gaugeEl.style.height = gPx + "px"; }
+    if(curEl){ curEl.style.bottom = gPx + "px"; }
+    // accent: flood level overrides toward red on the gauge fill
+    var accent = (lvl === "high" || lvl === "watch") ? "#c0392b" : STATES[current].accent;
+    card.style.setProperty("--accent", accent);
+    // gauge aria-label
+    var aria = lvl === "high" ? "Flood risk high — water rising"
+             : lvl === "watch" ? "Flood risk — water building"
+             : (current === "dry" ? "Calm — no flooding" : "Water level low");
+    if(gaugeEl){ gaugeEl.setAttribute("aria-label", aria); }
+    floodLvlTxt.textContent = "Level " + lvl + " · water ~" + hPct + "% · " +
+      (lvl==="low" ? "no flood line" : "flood line shown, water tinting red");
+    // mechanism diagram marker (Plate XII): along 700px track from x=20
+    if(marker){ marker.setAttribute("transform","translate(" + (20 + (pct/100)*700) + ",0)"); }
+    if(wFill){
+      var fillH = Math.round(180 * Math.min(0.95, hPct/100 + 0.06));
+      var y = 220 - fillH;
+      wFill.setAttribute("y", y); wFill.setAttribute("height", fillH);
+      wFillEdge.setAttribute("y", y);
+      var col = (lvl === "high" || lvl === "watch") ? "#c0392b"
+              : current === "now" ? "#d98a2b" : current === "incoming" ? "#2f7db0" : "#5a8f86";
+      wFill.setAttribute("fill", col); wFillEdge.setAttribute("fill", col);
+      if(wPct) wPct.textContent = "~" + hPct + "% height";
+    }
+    roWater.textContent = gPx + "px";
+    roFlood.textContent = lvl;
+    roAccent.textContent = accent;
+  }
+
+  segBtns.forEach(function(b){ b.addEventListener("click", function(){ applyState(b.dataset.state); }); });
+  slider.addEventListener("input", function(){ applyFlood(+slider.value); });
+
+  applyState("dry");
+})();
+</script>
+</body>
+</html>
