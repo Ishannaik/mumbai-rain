@@ -4,9 +4,11 @@
 // verdict h1 carries real, locality-specific text so the page is meaningful and
 // robust even if the client script never runs. ONE bundled <script> island then
 // hydrates interactivity (geolocate, live fetch, model, gauge, picker, window,
-// rain). Tom Select is loaded from a pinned CDN; the island degrades to the
-// native <select> if it fails.
+// rain). The locality picker is a custom, dependency-free overlay (a centered
+// modal on desktop, a bottom sheet on mobile) that enhances the server-rendered
+// native <select>; if the island never runs, the bare <select> still works.
 import "../styles/almanac.css";
+import localities from "../data/localities.json";
 
 export interface Props {
   title: string;
@@ -28,7 +30,13 @@ const {
 } = Astro.props;
 
 const canonical = new URL(canonicalPath, Astro.site).href;
-const TS_VERSION = "2.4.3"; // pinned Tom Select
+
+// Index of the pre-selected locality for the no-JS <select> (-1 on the home
+// page, where geolocation decides and the bare control shows the first option
+// until the client island resolves the user's spot).
+const defaultIdx = defaultLocality
+  ? localities.findIndex((l) => l.name === defaultLocality)
+  : -1;
 ---
 <!doctype html>
 <html lang="en">
@@ -60,15 +68,6 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
     rel="stylesheet"
   />
 
-  <!-- Tom Select (pinned). Base theme first so almanac.css overrides win. -->
-  <link
-    rel="stylesheet"
-    href={`https://cdn.jsdelivr.net/npm/tom-select@${TS_VERSION}/dist/css/tom-select.min.css`}
-  />
-  <script
-    is:inline
-    src={`https://cdn.jsdelivr.net/npm/tom-select@${TS_VERSION}/dist/js/tom-select.complete.min.js`}
-  ></script>
 </head>
 <body>
   <!-- THE RISING WATER — the signature. Visible WITHOUT JS (calm base line);
@@ -91,7 +90,9 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
       <span class="loc-pill">
         <span class="loc-pin" aria-hidden="true">📍</span>
         <select id="locality" aria-label="Choose your Mumbai area">
-          <!-- options injected by the island -->
+          {localities.map((l, i) => (
+            <option value={i} selected={i === defaultIdx}>{l.name}</option>
+          ))}
         </select>
       </span>
     </header>
@@ -104,7 +105,7 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
       <!-- Leave-now action — only shown when rain is incoming. -->
       <p id="leave" class="leave" hidden></p>
 
-      <!-- FORECAST WINDOW — mono segmented control (1h / 2h / 3h / 6h). -->
+      <!-- FORECAST WINDOW — mono segmented control (1h / 2h / 3h / 6h / 12h / 24h). -->
       <div class="horizon">
         <span class="horizon-label" id="horizon-label">Forecast window</span>
         <div class="segmented" role="group" aria-labelledby="horizon-label">
@@ -112,7 +113,15 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
           <button type="button" data-h="2" aria-pressed="true">2h</button>
           <button type="button" data-h="3" aria-pressed="false">3h</button>
           <button type="button" data-h="6" aria-pressed="false">6h</button>
+          <button type="button" data-h="12" aria-pressed="false">12h</button>
+          <button type="button" data-h="24" aria-pressed="false">24h</button>
         </div>
+        <!-- Honest reliability caption — the wider the window, the less it can be
+             trusted on exact timing. The island rewrites it on every change. -->
+        <p class="horizon-note" id="horizon-note" data-tier="now" aria-live="polite">
+          <span class="horizon-note-dot" aria-hidden="true"></span>
+          <span class="horizon-note-text">Nowcast — most accurate</span>
+        </p>
       </div>
     </section>
 
@@ -152,16 +161,26 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
     const elFlood = document.getElementById("flood");
     const elHonesty = document.getElementById("honesty");
     const segBtns = Array.from(document.querySelectorAll(".segmented button"));
+    const elHorizonNote = document.getElementById("horizon-note");
+    const elHorizonNoteText = elHorizonNote && elHorizonNote.querySelector(".horizon-note-text");
 
     const API = "https://api.open-meteo.com/v1/forecast";
 
     let MODEL, ZONES, LOCALITIES;
     let activeLoc = null;     // currently shown {name, lat, lon}
     let reqToken = 0;         // guards against out-of-order async renders
-    let horizon = 2;          // forecast window in hours (1/2/3/6), default 2
+    let horizon = 2;          // forecast window in hours (1/2/3/6/12/24), default 2
     let lastFc = null;        // cached shaped forecast (so window changes don't re-fetch)
     let lastCurrent = null;   // cached current-conditions block
-    let tom = null;           // Tom Select instance, if it initialised
+
+    // --- custom locality picker state (assigned in buildPicker) ---
+    let pick = null;          // sheet refs: { overlay, sheet, input, status, empty, locateBtn, locateLabel, locateErr }
+    let trigger = null;       // the pill button that opens the picker
+    let triggerName = null;   // the pill's visible area label
+    let rowEls = [];          // all 36 area rows (each carries data-idx)
+    let groupHeadEls = [];    // region headers (hidden while searching)
+    let pickerOpen = false;
+    let lastFocus = null;     // element to restore focus to on close
 
     const json = (path) => fetch(path).then((r) => r.json());
 
@@ -444,7 +463,7 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
 
     // Compute + paint the verdict from the cached forecast for the current window.
     // Called after a fetch (render) AND directly on forecast-window changes —
-    // so switching 1h/2h/3h/6h is instant and never re-fetches.
+    // so switching 1h/2h/3h/6h/12h/24h is instant and never re-fetches.
     function paintVerdict() {
       if (!lastFc) return;
       const v = verdict(MODEL, lastFc, lastFc.nowHour, lastFc.recentRain, horizon);
@@ -503,11 +522,21 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
       return best;
     }
 
-    // Set both the native <select> and Tom Select (silently — no render loop).
+    // Reflect the chosen area everywhere WITHOUT triggering a render: the native
+    // <select> (keeps the no-JS fallback in sync), the pill label, and the
+    // picker's highlighted row. Used by the picker and the geolocation/boot paths.
     function selectIndex(idx) {
       if (idx < 0) return;
       sel.value = String(idx);
-      if (tom) tom.setValue(String(idx), true);
+      const name = (LOCALITIES[idx] && LOCALITIES[idx].name) || "";
+      if (triggerName) triggerName.textContent = name;
+      if (trigger) trigger.setAttribute("aria-label", `Change your area — currently ${name}`);
+      rowEls.forEach((b) => {
+        const on = Number(b.dataset.idx) === idx;
+        b.classList.toggle("is-active", on);
+        if (on) b.setAttribute("aria-current", "true");
+        else b.removeAttribute("aria-current");
+      });
     }
 
     function resolveAndRender() {
@@ -517,7 +546,7 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
         const idx = LOCALITIES.findIndex((l) => l.name === pinned);
         if (idx >= 0) { selectIndex(idx); render(LOCALITIES[idx]); return; }
       }
-      if (!navigator.geolocation) { render(LOCALITIES[0]); return; }
+      if (!navigator.geolocation) { selectIndex(0); render(LOCALITIES[0]); return; }
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const here = nearestLocality(pos.coords.latitude, pos.coords.longitude);
@@ -526,46 +555,329 @@ const TS_VERSION = "2.4.3"; // pinned Tom Select
           selectIndex(LOCALITIES.findIndex((l) => l.name === here.name));
           render(loc);
         },
-        () => render(LOCALITIES[0]),
+        () => { selectIndex(0); render(LOCALITIES[0]); },
         { timeout: 8000, maximumAge: 600000 }
       );
     }
 
-    // --- Feature 1: searchable picker (Tom Select), Almanac-themed ---
-    function initPicker() {
-      LOCALITIES.forEach((l, i) => sel.add(new Option(l.name, String(i))));
-      // Native fallback always works (no-JS keeps the bare <select>, and this
-      // listener covers the case where Tom Select fails to load).
-      sel.addEventListener("change", () => render(LOCALITIES[Number(sel.value)]));
+    // --- Feature 1: the locality picker — a custom, dependency-free overlay ---
+    // A different pattern from a dropdown: tapping the pill opens a centered modal
+    // (desktop) or a bottom sheet (mobile) with a search box, a "use my location"
+    // button, and the 36 areas grouped by Mumbai region. It enhances the native
+    // <select>; if anything here throws, the bare <select> + its change handler
+    // remain as the working fallback. Regions are ordered south → far-north, the
+    // way each local-train line actually runs.
+    const REGIONS = [
+      { title: "South Mumbai",
+        names: ["Colaba", "Churchgate", "Byculla", "Lower Parel", "Worli"] },
+      { title: "Western Suburbs",
+        names: ["Bandra", "Santacruz", "Vile Parle", "Juhu", "Andheri",
+                "Jogeshwari", "Goregaon", "Malad", "Kandivali", "Borivali"] },
+      { title: "Central & Eastern Suburbs",
+        names: ["Dadar", "Matunga", "Mahim", "Sion", "Kurla",
+                "Ghatkopar", "Vikhroli", "Powai", "Bhandup"] },
+      { title: "Harbour & Navi Mumbai",
+        names: ["Wadala", "Chembur", "Vashi (Navi Mumbai)", "Panvel"] },
+      { title: "Thane & Far Suburbs",
+        names: ["Mulund", "Dombivli", "Thane", "Kalyan", "Mira Road",
+                "Bhayandar", "Vasai", "Nalasopara"] },
+    ];
 
-      if (typeof window.TomSelect === "function") {
-        try {
-          tom = new window.TomSelect(sel, {
-            maxOptions: null,
-            searchField: ["text"],
-            sortField: { field: "text", direction: "asc" },
-            placeholder: "Search area…",
-            controlInput: '<input type="text" autocomplete="off" />',
-            onChange: (val) => {
-              if (val === "" || val == null) return;
-              render(LOCALITIES[Number(val)]);
-            },
-          });
-          locPill.classList.add("ts-enhanced");
-        } catch (err) {
-          console.error("Tom Select init failed; using native select.", err);
-        }
+    function initPicker() {
+      // Native fallback: if the custom picker can't build, the still-visible
+      // <select> drives a render on change.
+      sel.addEventListener("change", () => render(LOCALITIES[Number(sel.value)]));
+      try {
+        buildPicker();
+        locPill.classList.add("is-enhanced");
+      } catch (err) {
+        console.error("Custom picker failed to build; using native select.", err);
       }
     }
 
+    // Order LOCALITIES into region groups; any unmapped area lands in a trailing
+    // "More areas" group so a data change can never silently drop a locality.
+    function groupLocalities() {
+      const seen = new Set();
+      const groups = REGIONS.map((r) => {
+        const items = [];
+        r.names.forEach((n) => {
+          const i = LOCALITIES.findIndex((l) => l.name === n);
+          if (i >= 0 && !seen.has(i)) { seen.add(i); items.push(i); }
+        });
+        return { title: r.title, items };
+      }).filter((g) => g.items.length);
+      const rest = LOCALITIES.map((_, i) => i).filter((i) => !seen.has(i));
+      if (rest.length) groups.push({ title: "More areas", items: rest });
+      return groups;
+    }
+
+    function el(tag, cls, attrs) {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (attrs) for (const k in attrs) n.setAttribute(k, attrs[k]);
+      return n;
+    }
+
+    function buildPicker() {
+      // The pill becomes the trigger button (the native <select> stays in the DOM
+      // under .is-enhanced as the no-JS fallback).
+      trigger = el("button", "loc-trigger", {
+        type: "button", "aria-haspopup": "dialog",
+        "aria-expanded": "false", "aria-controls": "locpick",
+      });
+      trigger.innerHTML =
+        '<span class="loc-trigger-pin" aria-hidden="true">📍</span>' +
+        '<span class="loc-name"></span>' +
+        '<span class="loc-caret" aria-hidden="true">▾</span>';
+      triggerName = trigger.querySelector(".loc-name");
+      triggerName.textContent = (app.dataset.defaultLocality || "").trim() || "Mumbai";
+      trigger.addEventListener("click", openPicker);
+
+      const overlay = el("div", "locpick-overlay", { id: "locpick" });
+      const sheet = el("div", "locpick-sheet", {
+        role: "dialog", "aria-modal": "true", "aria-labelledby": "locpick-title",
+      });
+      overlay.appendChild(sheet);
+
+      sheet.appendChild(el("div", "locpick-grab", { "aria-hidden": "true" }));
+
+      const head = el("div", "locpick-head");
+      const heading = el("div", "locpick-heading");
+      const eyebrow = el("p", "locpick-eyebrow"); eyebrow.textContent = "Your area";
+      const title = el("h2", "locpick-title", { id: "locpick-title" });
+      title.textContent = "Where are you?";
+      heading.appendChild(eyebrow); heading.appendChild(title);
+      const close = el("button", "locpick-close", { type: "button", "aria-label": "Close" });
+      close.innerHTML = "&#10005;";
+      close.addEventListener("click", closePicker);
+      head.appendChild(heading); head.appendChild(close);
+      sheet.appendChild(head);
+
+      const tools = el("div", "locpick-tools");
+      const searchWrap = el("div", "locpick-search");
+      const glyph = el("span", "locpick-search-glyph", { "aria-hidden": "true" });
+      glyph.textContent = "⌕";
+      const label = el("label", "locpick-vh", { for: "locpick-input" });
+      label.textContent = "Search your area";
+      const input = el("input", "locpick-input", {
+        id: "locpick-input", type: "text", autocomplete: "off",
+        autocapitalize: "off", spellcheck: "false", placeholder: "Search your area…",
+      });
+      searchWrap.appendChild(glyph);
+      searchWrap.appendChild(label);
+      searchWrap.appendChild(input);
+
+      const locateBtn = el("button", "locpick-locate", { type: "button" });
+      locateBtn.innerHTML =
+        '<span class="locpick-locate-pin" aria-hidden="true">📍</span>' +
+        '<span class="locpick-locate-label">Use my location</span>';
+      const locateErr = el("p", "locpick-locate-err", { role: "alert", hidden: "" });
+
+      tools.appendChild(searchWrap);
+      tools.appendChild(locateBtn);
+      tools.appendChild(locateErr);
+      sheet.appendChild(tools);
+
+      const list = el("div", "locpick-list");
+      const status = el("p", "locpick-status locpick-vh", { role: "status", "aria-live": "polite" });
+      list.appendChild(status);
+
+      rowEls = [];
+      groupHeadEls = [];
+      groupLocalities().forEach((g) => {
+        const gh = el("div", "locpick-group-head");
+        const gt = el("span", "locpick-group-title"); gt.textContent = g.title;
+        const gn = el("span", "locpick-group-n", { "aria-hidden": "true" });
+        gn.textContent = String(g.items.length);
+        gh.appendChild(gt); gh.appendChild(gn);
+        list.appendChild(gh);
+        groupHeadEls.push(gh);
+        g.items.forEach((i) => {
+          const loc = LOCALITIES[i];
+          const row = el("button", "locpick-row", {
+            type: "button", "data-idx": String(i),
+            "aria-label": `${loc.name}, ${g.title}`,
+          });
+          row.dataset.name = loc.name.toLowerCase();
+          const nm = el("span", "locpick-row-name"); nm.textContent = loc.name;
+          const co = el("span", "locpick-row-coord", { "aria-hidden": "true" });
+          co.textContent = `${loc.lat.toFixed(2)}°N`;
+          row.appendChild(nm); row.appendChild(co);
+          row.addEventListener("click", () => selectArea(i));
+          list.appendChild(row);
+          rowEls.push(row);
+        });
+      });
+      const empty = el("p", "locpick-empty", { hidden: "" });
+      list.appendChild(empty);
+      sheet.appendChild(list);
+
+      // Wiring.
+      input.addEventListener("input", filterRows);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown") {
+          const vis = visibleRows();
+          if (vis.length) { e.preventDefault(); vis[0].focus(); }
+        }
+      });
+      list.addEventListener("keydown", onListKeydown);
+      locateBtn.addEventListener("click", onLocate);
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) closePicker(); });
+      document.addEventListener("keydown", onGlobalKeydown);
+
+      pick = {
+        overlay, sheet, input, status, empty, locateBtn,
+        locateLabel: locateBtn.querySelector(".locpick-locate-label"), locateErr,
+      };
+
+      // Commit the enhancement (only reached if nothing above threw).
+      document.body.appendChild(overlay);
+      locPill.appendChild(trigger);
+    }
+
+    function visibleRows() { return rowEls.filter((b) => !b.hidden); }
+
+    function filterRows() {
+      const raw = pick.input.value.trim();
+      const q = raw.toLowerCase();
+      let n = 0;
+      rowEls.forEach((b) => {
+        const match = !q || b.dataset.name.includes(q);
+        b.hidden = !match;
+        if (match) n++;
+      });
+      // A search flattens the regions into one filtered list.
+      groupHeadEls.forEach((h) => { h.hidden = q.length > 0; });
+      pick.empty.hidden = n > 0;
+      if (!n) pick.empty.textContent = `No area matches “${raw}”.`;
+      pick.status.textContent = n ? `${n} area${n === 1 ? "" : "s"}` : "No matches";
+    }
+
+    function onListKeydown(e) {
+      const cur = document.activeElement;
+      if (!cur || !cur.classList || !cur.classList.contains("locpick-row")) return;
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      e.preventDefault();
+      const vis = visibleRows();
+      const i = vis.indexOf(cur);
+      if (e.key === "ArrowDown") (vis[Math.min(i + 1, vis.length - 1)] || cur).focus();
+      else if (i <= 0) pick.input.focus();
+      else vis[i - 1].focus();
+    }
+
+    // Tab cycles within the sheet; Esc closes it. (APG modal-dialog pattern.)
+    function onGlobalKeydown(e) {
+      if (!pickerOpen) return;
+      if (e.key === "Escape") { e.preventDefault(); closePicker(); return; }
+      if (e.key !== "Tab") return;
+      const f = Array.from(pick.sheet.querySelectorAll("button, input"))
+        .filter((x) => !x.hidden && !x.disabled && x.offsetParent !== null);
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+
+    function openPicker() {
+      if (pickerOpen || !pick) return;
+      pickerOpen = true;
+      lastFocus = document.activeElement;
+      pick.input.value = "";
+      pick.locateErr.hidden = true;
+      filterRows();
+      pick.overlay.classList.add("is-open");
+      trigger.setAttribute("aria-expanded", "true");
+      document.body.classList.add("locpick-lock");
+      app.toggleAttribute("inert", true);
+      requestAnimationFrame(() => {
+        pick.input.focus();
+        const act = rowEls.find((b) => b.classList.contains("is-active"));
+        if (act) act.scrollIntoView({ block: "center" });
+      });
+    }
+
+    function closePicker() {
+      if (!pickerOpen) return;
+      pickerOpen = false;
+      pick.overlay.classList.remove("is-open");
+      trigger.setAttribute("aria-expanded", "false");
+      document.body.classList.remove("locpick-lock");
+      app.toggleAttribute("inert", false);
+      // Return focus to whatever opened the picker — the trigger — per the APG
+      // modal pattern (fall back to it if the prior focus is gone or was <body>).
+      const restore = (lastFocus && document.contains(lastFocus) && lastFocus !== document.body)
+        ? lastFocus : trigger;
+      restore.focus();
+    }
+
+    // The make-or-break: a tap drives the SAME path the old <select> change used —
+    // selectIndex() syncs the UI, render() re-fetches + repaints for the area.
+    function selectArea(idx) {
+      selectIndex(idx);
+      closePicker();
+      render(LOCALITIES[idx]);
+    }
+
+    function onLocate() {
+      const btn = pick.locateBtn;
+      pick.locateErr.hidden = true;
+      if (!navigator.geolocation) {
+        pick.locateErr.hidden = false;
+        pick.locateErr.textContent = "Location isn’t available here. Pick an area below.";
+        return;
+      }
+      btn.disabled = true;
+      btn.classList.add("is-loading");
+      pick.locateLabel.textContent = "Finding you…";
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          resetLocate();
+          const here = nearestLocality(pos.coords.latitude, pos.coords.longitude);
+          selectIndex(LOCALITIES.findIndex((l) => l.name === here.name));
+          closePicker();
+          render({ name: here.name, lat: pos.coords.latitude, lon: pos.coords.longitude });
+        },
+        () => {
+          resetLocate();
+          pick.locateErr.hidden = false;
+          pick.locateErr.textContent = "Couldn’t get your location. Pick an area below.";
+        },
+        { timeout: 8000, maximumAge: 600000 }
+      );
+    }
+
+    function resetLocate() {
+      pick.locateBtn.disabled = false;
+      pick.locateBtn.classList.remove("is-loading");
+      pick.locateLabel.textContent = "Use my location";
+    }
+
     // --- Feature 2: forecast-window selector ---
+    // The reliability caption is tied to the window, not the weather: a nowcast
+    // (≤2h) is the most trustworthy; the wider the horizon, the less the exact
+    // timing can be relied on. Honest by design — longer windows warn louder.
+    function horizonCaveat(h) {
+      if (h <= 2) return { tier: "now",  text: "Nowcast — most accurate" };
+      if (h <= 6) return { tier: "wide", text: "Wider view — less precise on timing" };
+      return { tier: "raw", text: "Raw forecast — least reliable for exact timing" };
+    }
+    function paintHorizonNote() {
+      if (!elHorizonNote) return;
+      const c = horizonCaveat(horizon);
+      elHorizonNote.dataset.tier = c.tier;
+      if (elHorizonNoteText) elHorizonNoteText.textContent = c.text;
+    }
+
     function initHorizon() {
+      paintHorizonNote();                         // sync the caption to the default window
       segBtns.forEach((btn) => {
         btn.addEventListener("click", () => {
           const h = Number(btn.dataset.h);
           if (h === horizon) return;
           horizon = h;
           segBtns.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+          paintHorizonNote();                     // keep the reliability caveat honest
           // Re-run verdict() over the new window using the cached forecast — instant,
           // no re-fetch. Fall back to a fetch only if we have no forecast yet.
           if (lastFc) paintVerdict();

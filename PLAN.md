@@ -1090,3 +1090,54 @@ Plan complete and saved to `mumbai-rain/PLAN.md`. Two execution options:
 2. **Inline Execution** — execute tasks in this session with checkpoints.
 
 Or run it autonomously via `/loop` (one task per iteration).
+
+---
+
+## UI Tasks — Monsoon Almanac frontend (location picker + forecast window)
+
+> Added per request. App shell: `src/layouts/Almanac.astro` (one bundled client island);
+> styles: `src/styles/almanac.css`; 36 areas: `src/data/localities.json`. Brand =
+> wet-newsprint paper / storm ink / radar-blue accent, Fraunces · Newsreader · IBM Plex
+> Mono · Tiro Devanagari. Content stays visible without JS; `bun run build` = 37 pages.
+> Status: all items completed + verified in a local `bun run preview` this session.
+
+### UI Task A: Replace the Tom Select dropdown with a custom location picker
+
+**Files:** `src/layouts/Almanac.astro`, `src/styles/almanac.css`, `src/data/localities.json`
+
+- [x] Remove Tom Select entirely — CDN `<link>`/`<script>`, init code, and all `.ts-*` CSS
+- [x] Tap the pill → overlay with a dimmed storm-ink backdrop: centered modal on desktop,
+      full-width bottom sheet sliding up on mobile (≤600px), never edge-clipped
+- [x] Big search input ("Search your area…") filtering all 36 as you type
+- [x] Prominent "📍 Use my location" button (geolocation → nearest area)
+- [x] 36 areas grouped by Mumbai region under mono headers — South Mumbai / Western Suburbs /
+      Central & Eastern Suburbs / Harbour & Navi Mumbai / Thane & Far Suburbs; search
+      flattens to one filtered list
+- [x] Almanac theming: paper surfaces (no white), hairline dividers, Plex Mono rows,
+      radar-blue active/hover, custom thin scrollbar (not the default grey), generous tap
+      targets, subtle fade/slide
+- [x] Selecting closes the sheet + drives the SAME render path (`selectIndex` + `render`);
+      choice shown in the pill
+- [x] a11y: `role="dialog"` aria-modal, focus into search on open, focus trap, Esc/backdrop
+      close; server-rendered native `<select>` kept as the no-JS fallback; reduced-motion → no slide
+
+### UI Task B: Upgrade the forecast-window control
+
+**Files:** `src/layouts/Almanac.astro`, `src/styles/almanac.css`
+
+- [x] Windows: 1h / 2h / 3h / 6h / 12h / 24h (was 1h/2h/3h/6h)
+- [x] Open-Meteo fetch `forecast_days=2` so long windows + the 2h window near midnight
+      always have data (already 2; confirmed sufficient — ≥25 future hours worst case)
+- [x] Instant re-compute on change via `paintVerdict()` from the cached forecast — no re-fetch
+- [x] Honest accuracy caveat that updates with the window — quiet on-brand mono caption with a
+      radar-blip dot: ≤2h "Nowcast — most accurate"; 3–6h "Wider view — less precise on
+      timing"; 12–24h "Raw forecast — least reliable for exact timing"
+
+### Verify
+
+- [x] `bun run build` → 37 pages, Complete
+- [x] Tom Select gone (grep: no `TomSelect`/`tom-select`/`TS_VERSION`/`.ts-`/`jsdelivr`)
+- [x] Picker opens as a themed modal (desktop) + bottom sheet (mobile); no white, custom
+      scrollbar; search filters, region groups render, geolocation button wired
+- [x] Window control has 6 options, caveat updates, window change does NOT re-fetch
+- [x] `nowcast.js` ↔ `train.py` parity intact (FEATURE_NAMES order unchanged; neither file touched)

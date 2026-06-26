@@ -80,6 +80,14 @@ body::before {
   font-family: "IBM Plex Mono", monospace; font-size: .55rem;
   color: var(--ink-soft); font-variant-numeric: tabular-nums;
 }
+/* Faint vertical spine joining 40·20·0 so the ruler reads as ONE vertical scale,
+   not three loose numbers. Kills the "is 0.3 plotted at the 20 line?" illusion —
+   the measured-now row's hairline coincidentally meets the 20 tick, and without a
+   spine the eye pairs them. The spine binds the ticks to the right-edge gauge. */
+.ruler::before {
+  content: ""; position: absolute; right: 0; top: .35rem; bottom: .35rem;
+  width: 1px; background: var(--rule); opacity: .65;
+}
 .ruler span { position: relative; padding-right: 9px; }
 .ruler span::after {
   content: ""; position: absolute; right: 0; top: 50%; width: 6px; height: 1px;
@@ -137,7 +145,7 @@ body::before {
   font-family: "Tiro Devanagari Marathi", serif;
   font-size: clamp(2rem, 9vw, 2.8rem); line-height: .86; color: var(--ink);
 }
-/* native pill — the no-JS / Tom-Select-failed fallback */
+/* native pill — the no-JS / picker-failed fallback */
 .loc-pill {
   display: inline-flex; align-items: center; gap: 4px;
   border: 1px solid var(--rule); background: var(--paper-2);
@@ -159,11 +167,29 @@ body::before {
 #locality:focus-visible {
   outline: 2px solid var(--ink); outline-offset: 4px; border-radius: 6px;
 }
-/* When Tom Select takes over, hide the bare pill chrome (the arrow + border come
-   from .ts-wrapper). The native <select> is removed from flow by Tom Select. */
-.loc-pill.ts-enhanced { border: 0; background: transparent; padding: 0; }
-.loc-pill.ts-enhanced::after { content: none; }
-.loc-pill.ts-enhanced .loc-pin { display: none; }
+/* When the custom picker is active, the pill becomes a button: hide the bare-pill
+   chrome and the native <select> (kept in the DOM as the no-JS fallback). */
+.loc-pill.is-enhanced { padding: 0; }
+.loc-pill.is-enhanced::after { content: none; }
+.loc-pill.is-enhanced > .loc-pin,
+.loc-pill.is-enhanced > #locality { display: none; }
+
+.loc-trigger {
+  display: inline-flex; align-items: center; gap: 6px;
+  appearance: none; background: transparent; border: 0; cursor: pointer;
+  border-radius: 999px; color: var(--ink);
+  font-family: "IBM Plex Mono", monospace; font-weight: 500;
+  font-size: .92rem; letter-spacing: .01em;
+  padding: 10px 13px; min-height: 44px;          /* generous tap target */
+  transition: background .2s ease;
+}
+.loc-trigger:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.loc-trigger:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.loc-trigger-pin { font-size: .82rem; line-height: 1; }
+.loc-trigger .loc-name {
+  max-width: 44vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.loc-trigger .loc-caret { color: var(--ink-soft); font-size: .82rem; }
 
 /* ---- hero verdict — the 2-second answer ---- */
 .hero {
@@ -208,13 +234,14 @@ body::before {
   letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft);
 }
 .segmented {
-  display: inline-flex; align-self: flex-start;
+  display: flex; width: 100%;          /* six even segments — an instrument dial */
   border: 1px solid var(--rule); background: var(--paper-2);
 }
 .segmented button {
+  flex: 1 1 0; min-width: 0;
   appearance: none; background: transparent; border: 0; cursor: pointer;
   font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: .82rem;
-  color: var(--ink-soft); padding: 9px 15px; min-width: 46px; min-height: 40px;
+  color: var(--ink-soft); padding: 9px 6px; min-height: 42px;
   border-left: 1px solid var(--rule);
   font-variant-numeric: tabular-nums; transition: color .2s ease, background .2s ease;
 }
@@ -224,6 +251,25 @@ body::before {
   background: var(--ink); color: var(--paper);
 }
 .segmented button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* honest reliability caption under the window — quiet mono, with a radar blip that
+   weakens as the window widens (confident dot -> muted -> hollow ring) */
+.horizon-note {
+  display: flex; align-items: center; gap: 7px;
+  font-family: "IBM Plex Mono", monospace; font-size: .68rem;
+  letter-spacing: .03em; color: var(--ink-soft);
+}
+.horizon-note-dot {
+  flex: none; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--radar-rain);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--radar-rain) 16%, transparent);
+}
+.horizon-note[data-tier="wide"] .horizon-note-dot {
+  background: var(--ink-soft); box-shadow: none;
+}
+.horizon-note[data-tier="raw"] .horizon-note-dot {
+  background: transparent; box-shadow: inset 0 0 0 1px var(--ink-soft);
+}
 
 /* ---- detail rows (quiet, tabular) ---- */
 .details { display: flex; flex-direction: column; }
@@ -266,50 +312,179 @@ body::before {
 /* loading placeholder reads as a whisper, not a spinner that never resolves */
 .state-loading .verdict { color: var(--ink-soft); }
 
-/* ================= Tom Select — themed to the Almanac (NOT default blue/white) ================= */
-/* Overrides the CDN base theme: wet-newsprint surfaces, storm ink, mono type,
-   the radar-rain hue ONLY on the active/selected row. Zero border-radius. */
-.ts-wrapper { width: auto; min-width: 9.5rem; }
-.ts-wrapper.single .ts-control,
-.ts-control {
-  background: var(--paper-2); border: 1px solid var(--rule);
-  border-radius: 999px; box-shadow: none; color: var(--ink);
-  font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: .92rem;
-  padding: 9px 30px 9px 14px; min-height: 44px;
+/* ================= the locality picker — custom overlay (modal / bottom sheet) ================= */
+/* A different pattern from a dropdown: a dimmed storm-ink backdrop with a centered
+   modal on desktop and a full-width bottom sheet on mobile. Almanac surfaces:
+   wet-newsprint paper, hairline ink rules, IBM Plex Mono station rows with their
+   latitude, the radar-rain hue ONLY on the active/hovered row. Mobile-first —
+   these base rules ARE the bottom sheet; ≥601px re-centers it as a modal. */
+.locpick-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  background: rgba(22, 34, 31, .46);
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .22s ease, visibility .22s ease;
 }
-.ts-wrapper.single.input-active .ts-control,
-.ts-wrapper.single .ts-control { cursor: pointer; }
-.ts-control input, .ts-control input::placeholder {
-  color: var(--ink-soft); font-family: "IBM Plex Mono", monospace;
+@supports (backdrop-filter: blur(2px)) {
+  .locpick-overlay { backdrop-filter: blur(2px); }
 }
-.ts-wrapper.single .ts-control:not(.rt-mode)::after {
-  content: ""; position: absolute; top: 50%; right: 14px; margin-top: -3px;
-  border-style: solid; border-width: 5px 4px 0 4px;
-  border-color: var(--ink-soft) transparent transparent transparent;
+.locpick-overlay.is-open { opacity: 1; visibility: visible; pointer-events: auto; }
+
+.locpick-sheet {
+  display: flex; flex-direction: column;
+  width: 100%; max-height: 88svh;
+  background: var(--paper); color: var(--ink);
+  border-top: 2px solid var(--ink);
+  box-shadow: 0 -14px 40px rgba(22, 34, 31, .26);
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.2, .7, .2, 1);
 }
-.ts-wrapper.focus .ts-control {
-  border-color: var(--ink); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 16%, transparent);
+.locpick-overlay.is-open .locpick-sheet { transform: translateY(0); }
+
+/* mobile grab-handle (a bottom-sheet affordance; hidden on desktop) */
+.locpick-grab {
+  flex: none; width: 36px; height: 4px; margin: 10px auto 0;
+  background: var(--rule); border-radius: 2px;
 }
-.ts-dropdown {
-  background: var(--paper); border: 1px solid var(--ink); border-radius: 0;
-  box-shadow: 0 10px 28px rgba(22,34,31,.18); margin-top: 5px;
-  color: var(--ink); font-family: "IBM Plex Mono", monospace;
+
+.locpick-head {
+  flex: none; display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 14px 20px 12px;
 }
-.ts-dropdown .ts-dropdown-content { padding: 3px; }
-.ts-dropdown .option {
-  border-radius: 0; padding: 9px 12px; font-size: .86rem; color: var(--ink);
+.locpick-eyebrow {
+  font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--ink-soft);
+  margin-bottom: 3px;
 }
-.ts-dropdown .option:hover,
-.ts-dropdown .active {
-  background: var(--ink); color: var(--paper);
+/* sheet title in Newsreader italic — the reading voice (Fraunces stays the verdict's) */
+.locpick-title {
+  font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 400;
+  font-size: clamp(1.5rem, 6vw, 1.9rem); line-height: 1.05; color: var(--ink);
 }
-.ts-dropdown .option .highlight,
-.ts-dropdown .active .highlight {
-  background: color-mix(in srgb, var(--radar-rain) 50%, transparent);
-  border-radius: 0; box-shadow: 0 1px 0 var(--radar-rain);
+.locpick-close {
+  flex: none; appearance: none; background: transparent; border: 0; cursor: pointer;
+  width: 44px; height: 44px; margin: -6px -8px 0 0;
+  font-family: "IBM Plex Mono", monospace; font-size: 1rem; color: var(--ink-soft);
+  transition: color .2s ease;
 }
-.ts-dropdown .no-results { padding: 9px 12px; font-size: .82rem; color: var(--ink-soft); }
-.ts-wrapper.single .ts-control, .ts-dropdown, .ts-control input { line-height: 1.3; }
+.locpick-close:hover { color: var(--ink); }
+
+.locpick-tools {
+  flex: none; display: flex; flex-direction: column; gap: 10px;
+  padding: 0 20px 14px; border-bottom: 1px solid var(--rule);
+}
+.locpick-search { position: relative; display: flex; }
+.locpick-search-glyph {
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  color: var(--ink-soft); font-size: 1rem; pointer-events: none;
+}
+.locpick-input {
+  width: 100%; appearance: none; border-radius: 0;
+  background: var(--paper-2); border: 1px solid var(--rule); color: var(--ink);
+  font-family: "IBM Plex Mono", monospace; font-size: .95rem;
+  padding: 13px 14px 13px 38px; min-height: 48px;
+}
+.locpick-input::placeholder { color: var(--ink-soft); }
+.locpick-input:focus {
+  outline: none; border-color: var(--radar-rain);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--radar-rain) 22%, transparent);
+}
+/* solid storm-ink button — echoes the segmented control's pressed state */
+.locpick-locate {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  appearance: none; cursor: pointer; min-height: 48px;
+  background: var(--ink); color: var(--paper); border: 1px solid var(--ink);
+  font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: .9rem;
+  letter-spacing: .02em; transition: background .2s ease, opacity .2s ease;
+}
+.locpick-locate:hover { background: color-mix(in srgb, var(--ink) 86%, var(--paper)); }
+.locpick-locate:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.locpick-locate[disabled] { cursor: default; opacity: .7; }
+.locpick-locate-pin { font-size: .9rem; }
+.locpick-locate-err {
+  font-family: "IBM Plex Mono", monospace; font-size: .72rem;
+  color: var(--radar-flood); margin-top: 2px;
+}
+
+.locpick-list {
+  flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  scrollbar-width: thin;                         /* Firefox — slim, not a chunky bar */
+  scrollbar-color: var(--rule) transparent;      /* Firefox — ink-hairline thumb on paper */
+}
+/* WebKit/Blink: a thin almanac scrollbar — never the default chunky grey one */
+.locpick-list::-webkit-scrollbar { width: 9px; }
+.locpick-list::-webkit-scrollbar-track { background: transparent; }
+.locpick-list::-webkit-scrollbar-thumb {
+  background: var(--rule); border: 3px solid var(--paper);   /* inset -> reads as a hairline */
+}
+.locpick-list::-webkit-scrollbar-thumb:hover { background: var(--ink-soft); }
+/* region header — a sticky mono ledger line with the area count */
+.locpick-group-head {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 13px 20px 6px; background: var(--paper);
+  border-bottom: 1px solid var(--rule-soft);
+  font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft);
+}
+.locpick-group-n { font-variant-numeric: tabular-nums; opacity: .8; letter-spacing: 0; }
+
+.locpick-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+  width: 100%; appearance: none; cursor: pointer; text-align: left;
+  background: transparent; border: 0; border-bottom: 1px solid var(--rule-soft);
+  padding: 14px 20px; min-height: 52px; color: var(--ink);
+  font-family: "IBM Plex Mono", monospace;
+  transition: background .15s ease, box-shadow .15s ease, color .15s ease;
+}
+.locpick-row-name { font-size: .92rem; }
+.locpick-row-coord {
+  font-size: .68rem; color: var(--ink-soft); letter-spacing: .02em;
+  font-variant-numeric: tabular-nums; opacity: .75;
+}
+.locpick-row:hover {
+  background: var(--paper-2); box-shadow: inset 3px 0 0 var(--radar-rain);
+}
+.locpick-row:focus-visible {
+  outline: none; background: var(--paper-2);
+  box-shadow: inset 3px 0 0 var(--radar-rain),
+              0 0 0 2px color-mix(in srgb, var(--radar-rain) 30%, transparent);
+}
+.locpick-row.is-active { box-shadow: inset 3px 0 0 var(--radar-rain); }
+.locpick-row.is-active .locpick-row-name { color: var(--radar-rain); font-weight: 600; }
+.locpick-row.is-active .locpick-row-coord::before {
+  content: "●\00a0"; color: var(--radar-rain); opacity: 1;   /* a radar blip on the current spot */
+}
+/* a filtered-out row/header must beat its own display:flex
+   (equal specificity with the UA [hidden] rule → author source order would lose) */
+.locpick-row[hidden],
+.locpick-group-head[hidden] { display: none; }
+
+.locpick-empty {
+  padding: 22px 20px; font-family: "IBM Plex Mono", monospace;
+  font-size: .82rem; color: var(--ink-soft);
+}
+.locpick-vh {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* desktop: re-center the sheet as a modal card */
+@media (min-width: 601px) {
+  .locpick-overlay { justify-content: center; align-items: center; padding: 5vh 24px; }
+  .locpick-sheet {
+    width: 100%; max-width: 30rem; max-height: min(80vh, 40rem);
+    border: 1px solid var(--ink); border-top: 2px solid var(--ink);
+    box-shadow: 0 24px 60px rgba(22, 34, 31, .30);
+    transform: translateY(10px);
+  }
+  .locpick-grab { display: none; }
+}
+
+/* freeze background scroll while the picker is open */
+body.locpick-lock { overflow: hidden; }
 
 /* ================= motion (enhancement only; never hides content) ================= */
 .water { transition: height .6s cubic-bezier(.2,.7,.2,1),
@@ -325,6 +500,9 @@ body::before {
   .water, .water-cursor, .verdict, .leave, #flood { transition: none; }
   /* No animated rain under reduced motion — the JS engine is skipped too. */
   .rain-layer { display: none; }
+  /* The picker appears in place — no slide, no fade. */
+  .locpick-overlay, .locpick-sheet { transition: none; }
+  .locpick-sheet { transform: none; }
 }
 
 /* ================= focus + responsive ================= */
@@ -333,5 +511,5 @@ body::before {
 @media (max-width: 380px) {
   .masthead { gap: var(--s-3); }
   #app { gap: var(--s-4); }
-  .segmented button { padding: 9px 12px; min-width: 42px; }
+  .segmented button { padding: 9px 3px; font-size: .78rem; }
 }
