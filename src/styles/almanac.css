@@ -499,6 +499,53 @@ body::before {
 /* freeze background scroll while the picker is open */
 body.locpick-lock { overflow: hidden; }
 
+/* --- map pin picker (lazy Leaflet; shown when the sheet is .is-mapmode) --- */
+.locpick-mapbtn {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+  appearance: none; background: transparent; cursor: pointer;
+  border: 1px solid var(--rule); border-radius: 999px; padding: 5px 12px;
+  color: var(--ink); font-family: "IBM Plex Mono", monospace; font-size: .72rem;
+}
+.locpick-mapbtn:hover { border-color: var(--ink); }
+.locpick-mapbtn-ico { color: #2f7db0; font-size: .9rem; }
+
+.locpick-mapview { display: none; }
+.locpick-sheet.is-mapmode .locpick-list,
+.locpick-sheet.is-mapmode .locpick-tools { display: none; }
+.locpick-sheet.is-mapmode .locpick-mapview { display: flex; flex-direction: column; gap: var(--s-3); }
+
+.locpick-map-wrap {
+  position: relative; height: 44vh; min-height: 260px;
+  border: 1px solid var(--rule); overflow: hidden;
+}
+.locpick-map { position: absolute; inset: 0; background: var(--paper-2); }
+.locpick-mappin {
+  position: absolute; left: 50%; top: 50%; z-index: 1000;
+  transform: translate(-50%, -100%); pointer-events: none; font-size: 1.7rem;
+  filter: drop-shadow(0 2px 2px rgba(22, 34, 31, .35));
+}
+.locpick-mapbar { display: flex; align-items: center; gap: var(--s-3); }
+.locpick-mapnear {
+  flex: 1; margin: 0; text-align: center;
+  font-family: "IBM Plex Mono", monospace; font-size: .78rem; color: var(--ink-soft);
+}
+.locpick-mapnear-name { color: var(--ink); font-weight: 600; }
+.locpick-mapback {
+  appearance: none; background: transparent; border: 0; cursor: pointer;
+  color: var(--ink-soft); font-family: "IBM Plex Mono", monospace; font-size: .75rem;
+  padding: 6px 2px; white-space: nowrap;
+}
+.locpick-mapback:hover { color: var(--ink); }
+.locpick-mapuse {
+  appearance: none; cursor: pointer; border: 1px solid var(--ink);
+  background: var(--ink); color: var(--paper); white-space: nowrap;
+  font-family: "IBM Plex Mono", monospace; font-size: .78rem; font-weight: 500;
+  padding: 8px 14px; border-radius: 2px;
+}
+.locpick-mapuse:hover { background: #16221f; }
+/* tone Leaflet's attribution chip to the paper */
+.locpick-map .leaflet-control-attribution { font-size: 9px; background: rgba(221, 226, 220, .82); }
+
 /* ================= motion (enhancement only; never hides content) ================= */
 .water { transition: height .6s cubic-bezier(.2,.7,.2,1),
                      border-color .4s ease, background .4s ease; }

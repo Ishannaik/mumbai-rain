@@ -714,8 +714,16 @@ const defaultIdx = defaultLocality
         '<span class="locpick-locate-label">Use my location</span>';
       const locateErr = el("p", "locpick-locate-err", { role: "alert", hidden: "" });
 
+      // "Pin it on the map" — opens a lazy-loaded map for a true any-point pick
+      // (a spot between areas, or precise East/West).
+      const mapBtn = el("button", "locpick-mapbtn", { type: "button" });
+      mapBtn.innerHTML =
+        '<span class="locpick-mapbtn-ico" aria-hidden="true">◎</span>' +
+        '<span>Pin it on the map</span>';
+
       tools.appendChild(searchWrap);
       tools.appendChild(locateBtn);
+      tools.appendChild(mapBtn);
       tools.appendChild(locateErr);
       sheet.appendChild(tools);
 
@@ -753,6 +761,24 @@ const defaultIdx = defaultLocality
       list.appendChild(empty);
       sheet.appendChild(list);
 
+      // --- Map view (hidden until "Pin it on the map"); Leaflet loads on demand. ---
+      const mapView = el("div", "locpick-mapview");
+      const mapWrap = el("div", "locpick-map-wrap");
+      const mapEl = el("div", "locpick-map");
+      const mapPin = el("div", "locpick-mappin", { "aria-hidden": "true" });
+      mapPin.textContent = "📍";
+      mapWrap.appendChild(mapEl); mapWrap.appendChild(mapPin);
+      const mapBar = el("div", "locpick-mapbar");
+      const mapBack = el("button", "locpick-mapback", { type: "button" });
+      mapBack.innerHTML = "&#8249;&nbsp;Areas";
+      const mapNear = el("p", "locpick-mapnear");
+      mapNear.innerHTML = 'Nearest&nbsp;·&nbsp;<span class="locpick-mapnear-name">…</span>';
+      const mapUse = el("button", "locpick-mapuse", { type: "button" });
+      mapUse.textContent = "Use this spot";
+      mapBar.appendChild(mapBack); mapBar.appendChild(mapNear); mapBar.appendChild(mapUse);
+      mapView.appendChild(mapWrap); mapView.appendChild(mapBar);
+      sheet.appendChild(mapView);
+
       // Wiring.
       input.addEventListener("input", filterRows);
       input.addEventListener("keydown", (e) => {
@@ -763,12 +789,16 @@ const defaultIdx = defaultLocality
       });
       list.addEventListener("keydown", onListKeydown);
       locateBtn.addEventListener("click", onLocate);
+      mapBtn.addEventListener("click", openMapMode);
+      mapBack.addEventListener("click", closeMapMode);
+      mapUse.addEventListener("click", useMapSpot);
       overlay.addEventListener("click", (e) => { if (e.target === overlay) closePicker(); });
       document.addEventListener("keydown", onGlobalKeydown);
 
       pick = {
         overlay, sheet, input, status, empty, locateBtn,
         locateLabel: locateBtn.querySelector(".locpick-locate-label"), locateErr,
+        mapEl, mapNearName: mapNear.querySelector(".locpick-mapnear-name"),
       };
 
       // Commit the enhancement (only reached if nothing above threw).
@@ -825,6 +855,7 @@ const defaultIdx = defaultLocality
       lastFocus = document.activeElement;
       pick.input.value = "";
       pick.locateErr.hidden = true;
+      pick.sheet.classList.remove("is-mapmode"); // always open on the area list
       filterRows();
       pick.overlay.classList.add("is-open");
       trigger.setAttribute("aria-expanded", "true");
@@ -857,6 +888,60 @@ const defaultIdx = defaultLocality
       selectIndex(idx);
       closePicker();
       render(LOCALITIES[idx]);
+    }
+
+    // --- Map pin picker — lazy Leaflet, "center pin" pattern (drag the map, the
+    // pin holds centre; read getCenter()). Free CARTO Positron tiles ($0, but the
+    // CARTO/OSM tile policy is low-volume + attribution — fine at this scale). ---
+    let leafletP = null, lmap = null;
+    function loadLeaflet() {
+      if (window.L) return Promise.resolve(window.L);
+      if (leafletP) return leafletP;
+      leafletP = new Promise((resolve, reject) => {
+        document.head.appendChild(el("link", null, {
+          rel: "stylesheet", href: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+          integrity: "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=", crossorigin: "",
+        }));
+        const js = el("script", null, {
+          src: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+          integrity: "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=", crossorigin: "",
+        });
+        js.onload = () => resolve(window.L);
+        js.onerror = () => reject(new Error("leaflet"));
+        document.head.appendChild(js);
+      });
+      return leafletP;
+    }
+    function openMapMode() {
+      pick.sheet.classList.add("is-mapmode");
+      loadLeaflet().then((L) => {
+        if (!lmap) {
+          lmap = L.map(pick.mapEl, { zoomControl: true }).setView([19.076, 72.8777], 11);
+          L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+            attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 19,
+          }).addTo(lmap);
+          lmap.on("moveend", updateMapNearest);
+        }
+        lmap.invalidateSize(); // the container was display:none at create time
+        updateMapNearest();
+      }).catch(() => {
+        pick.sheet.classList.remove("is-mapmode");
+        pick.locateErr.hidden = false;
+        pick.locateErr.textContent = "Map couldn’t load. Pick an area below.";
+      });
+    }
+    function closeMapMode() { pick.sheet.classList.remove("is-mapmode"); }
+    function updateMapNearest() {
+      const c = lmap.getCenter();
+      pick.mapNearName.textContent = nearestLocality(c.lat, c.lng).name;
+    }
+    function useMapSpot() {
+      const c = lmap.getCenter();
+      const near = nearestLocality(c.lat, c.lng);
+      // Hyperlocal: verdict uses the exact pin coords, labelled with the nearest area.
+      selectIndex(LOCALITIES.findIndex((l) => l.name === near.name));
+      closePicker();
+      render({ name: near.name, lat: c.lat, lon: c.lng });
     }
 
     function onLocate() {
