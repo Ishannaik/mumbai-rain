@@ -90,6 +90,7 @@ body::before {
 
 /* live numeric cursor pinned at the waterline */
 .water-cursor {
+  display: none;   /* hidden per request — the floating corner badge read as clutter */
   position: fixed; right: 32px; bottom: var(--water-h); z-index: 2;
   transform: translateY(50%); pointer-events: none;
   font-family: "IBM Plex Mono", monospace; font-size: .6rem; color: var(--ink);
