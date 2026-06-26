@@ -10,6 +10,7 @@
     "quality": "fallow dead-code; fallow dupes; fallow health"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.3",
     "astro": "^7.0.3"
   },
   "devDependencies": {

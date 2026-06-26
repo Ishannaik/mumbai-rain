@@ -17,3 +17,5 @@ dist/
 Thumbs.db
 
 # NOTE: data/log.csv is NOT ignored — it's the training database, committed by the cron.
+
+.vercel
