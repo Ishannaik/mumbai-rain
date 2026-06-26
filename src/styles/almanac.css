@@ -484,6 +484,37 @@ body::before {
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
+/* --- "search any place" geocode fallback (places outside the curated 146) --- */
+/* Surfaces only when no curated area matches. Themed off .locpick-locate /
+   .locpick-mapbtn: same IBM Plex Mono, ink/paper surfaces, radar-blue accent —
+   no new colours. Results reuse .locpick-row, so they read as the same ledger. */
+.locpick-geo-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: calc(100% - 40px); margin: 14px 20px;
+  appearance: none; cursor: pointer; min-height: 46px;
+  background: var(--paper-2); color: var(--ink); border: 1px solid var(--rule);
+  font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: .86rem;
+  letter-spacing: .01em; padding: 11px 14px;
+  transition: border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+.locpick-geo-btn:hover { border-color: var(--radar-rain); box-shadow: inset 3px 0 0 var(--radar-rain); }
+.locpick-geo-btn:focus-visible {
+  outline: none; border-color: var(--radar-rain);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--radar-rain) 30%, transparent);
+}
+.locpick-geo-btn[hidden] { display: none; }
+.locpick-geo-ico { flex: none; color: var(--radar-rain); font-size: 1rem; }
+.locpick-geo-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.locpick-geo-status {
+  padding: 4px 20px 12px; font-family: "IBM Plex Mono", monospace;
+  font-size: .72rem; letter-spacing: .03em; color: var(--ink-soft);
+}
+.locpick-geo-status[hidden] { display: none; }
+/* a hairline ledge above the geocoded hits so they read as a distinct "anywhere"
+   group, not curated Mumbai areas */
+.locpick-geo-list:not(:empty) { border-top: 1px solid var(--rule-soft); }
+
 /* desktop: re-center the sheet as a modal card */
 @media (min-width: 601px) {
   .locpick-overlay { justify-content: center; align-items: center; padding: 5vh 24px; }

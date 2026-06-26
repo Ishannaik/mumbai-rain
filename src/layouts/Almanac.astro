@@ -189,6 +189,8 @@ const defaultIdx = defaultLocality
     let groupHeadEls = [];    // region headers (hidden while searching)
     let pickerOpen = false;
     let lastFocus = null;     // element to restore focus to on close
+    let geoQuery = "";        // backing query for the "search anywhere" geocode fallback
+    let geoToken = 0;         // guards against out-of-order / superseded geocode responses
 
     const json = (path) => fetch(path).then((r) => r.json());
 
@@ -759,6 +761,22 @@ const defaultIdx = defaultLocality
       });
       const empty = el("p", "locpick-empty", { hidden: "" });
       list.appendChild(empty);
+
+      // --- "Search any place" geocode fallback (places OUTSIDE the curated 146) ---
+      // The curated Mumbai list stays the PRIMARY result. The Open-Meteo geocoder
+      // lacks Mumbai East/West (ward-level) granularity — the curated 146 cover
+      // that — so this only surfaces when NOTHING curated matches a real query, for
+      // other cities/towns (Pune, Lonavala, …). Button + status + results sit at
+      // the foot of the list, just under the "no area matches" message.
+      const geoBtn = el("button", "locpick-geo-btn", { type: "button", hidden: "" });
+      geoBtn.innerHTML =
+        '<span class="locpick-geo-ico" aria-hidden="true">⌕</span>' +
+        '<span class="locpick-geo-label"></span>';
+      const geoStatus = el("p", "locpick-geo-status", { role: "status", "aria-live": "polite", hidden: "" });
+      const geoList = el("div", "locpick-geo-list");
+      list.appendChild(geoBtn);
+      list.appendChild(geoStatus);
+      list.appendChild(geoList);
       sheet.appendChild(list);
 
       // --- Map view (hidden until "Pin it on the map"); Leaflet loads on demand. ---
@@ -788,6 +806,7 @@ const defaultIdx = defaultLocality
         }
       });
       list.addEventListener("keydown", onListKeydown);
+      geoBtn.addEventListener("click", runGeocode);
       locateBtn.addEventListener("click", onLocate);
       mapBtn.addEventListener("click", openMapMode);
       mapBack.addEventListener("click", closeMapMode);
@@ -799,6 +818,7 @@ const defaultIdx = defaultLocality
         overlay, sheet, input, status, empty, locateBtn,
         locateLabel: locateBtn.querySelector(".locpick-locate-label"), locateErr,
         mapEl, mapNearName: mapNear.querySelector(".locpick-mapnear-name"),
+        geoBtn, geoBtnLabel: geoBtn.querySelector(".locpick-geo-label"), geoStatus, geoList,
       };
 
       // Commit the enhancement (only reached if nothing above threw).
@@ -822,6 +842,89 @@ const defaultIdx = defaultLocality
       pick.empty.hidden = n > 0;
       if (!n) pick.empty.textContent = `No area matches “${raw}”.`;
       pick.status.textContent = n ? `${n} area${n === 1 ? "" : "s"}` : "No matches";
+
+      // Geocode fallback. The curated 146 are the PRIMARY result; only when NOTHING
+      // curated matches a real query (≥2 chars) do we offer "search anywhere" — for
+      // places OUTSIDE Mumbai. Always reset first so any matches (or a fresh keystroke)
+      // clear a prior search; the Open-Meteo geocoder has no Mumbai East/West depth.
+      resetGeocode();
+      if (!n && raw.length >= 2) {
+        geoQuery = raw;
+        pick.geoBtnLabel.textContent = `Search “${raw}” anywhere`;
+        pick.geoBtn.hidden = false;
+      }
+    }
+
+    // Clear the geocode fallback UI (button + status + result rows) and invalidate
+    // any in-flight request. Called on every filterRows run and (via it) on open.
+    function resetGeocode() {
+      if (!pick) return;
+      geoToken++;
+      geoQuery = "";
+      pick.geoBtn.hidden = true;
+      pick.geoStatus.hidden = true;
+      pick.geoStatus.textContent = "";
+      pick.geoList.textContent = "";
+    }
+
+    // Geocode the typed query via Open-Meteo's FREE, keyless geocoder and list up to
+    // 6 hits as pickable rows. Calm states only; wrapped so it never throws into the
+    // page. A token guards against a slow response landing after newer typing.
+    async function runGeocode() {
+      const q = geoQuery;
+      if (!q) return;
+      const token = ++geoToken;
+      pick.geoBtn.hidden = true;
+      pick.geoList.textContent = "";
+      pick.geoStatus.hidden = false;
+      pick.geoStatus.textContent = "Searching…";
+      try {
+        const url =
+          `https://geocoding-api.open-meteo.com/v1/search` +
+          `?name=${encodeURIComponent(q)}&count=6&language=en&format=json`;
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`geocoder ${r.status}`);
+        const data = await r.json();
+        if (token !== geoToken) return;              // superseded by newer typing/search
+        const results = (data && data.results) || [];
+        if (!results.length) {
+          pick.geoStatus.textContent = `No place found for “${q}”.`;
+          return;
+        }
+        results.slice(0, 6).forEach((res) => {
+          // admin1 (state/region) + country_code, e.g. "Maharashtra · IN" — the
+          // disambiguator, since "Pune" can resolve to several places worldwide.
+          const where = [res.admin1, res.country_code].filter(Boolean).join(" · ");
+          const row = el("button", "locpick-row", {
+            type: "button",
+            "aria-label": [res.name, res.admin1, res.country].filter(Boolean).join(", "),
+          });
+          const nm = el("span", "locpick-row-name"); nm.textContent = res.name;
+          const co = el("span", "locpick-row-coord", { "aria-hidden": "true" });
+          co.textContent = where;
+          row.appendChild(nm); row.appendChild(co);
+          row.addEventListener("click", () => selectGeocoded(res));
+          pick.geoList.appendChild(row);
+        });
+        const c = pick.geoList.childElementCount;
+        pick.geoStatus.textContent = `${c} place${c === 1 ? "" : "s"} — tap to use`;
+      } catch (err) {
+        if (token !== geoToken) return;
+        pick.geoStatus.textContent = "Search failed — check your connection.";
+        pick.geoBtn.hidden = false;                  // keep the button for a retry
+        console.error("Geocode failed.", err);
+      }
+    }
+
+    // Pick a geocoded place (OUTSIDE the curated 146). It has no curated index, so we
+    // do NOT call selectIndex with a fake one — set the pill label + aria-label, clear
+    // the curated active-row markers, then render the verdict at the EXACT geocoded coords.
+    function selectGeocoded(res) {
+      if (triggerName) triggerName.textContent = res.name;
+      if (trigger) trigger.setAttribute("aria-label", `Change your area — currently ${res.name}`);
+      rowEls.forEach((b) => { b.classList.remove("is-active"); b.removeAttribute("aria-current"); });
+      closePicker();
+      render({ name: res.name, lat: res.latitude, lon: res.longitude });
     }
 
     function onListKeydown(e) {
