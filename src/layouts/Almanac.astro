@@ -234,6 +234,21 @@ const defaultIdx = defaultLocality
       return "#" + c.map((x) => x.toString(16).padStart(2, "0")).join("");
     }
 
+    // "2026-06-26T16:00" -> "4 PM". The forecast is hourly and already in IST
+    // (timezone=Asia/Kolkata), so we read the hour off the string — no Date, no
+    // timezone math. Minutes are dropped: the model can't honestly resolve them.
+    function clockLabel(iso) {
+      const h = Number(iso.slice(11, 13));
+      const ampm = h < 12 ? "AM" : "PM";
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      return `${h12} ${ampm}`;
+    }
+    // Wall-clock label for a forecast-hour offset, e.g. clockAt(v.endsInHrs).
+    const clockAt = (offset) => {
+      const iso = lastFc && lastFc.valid_at && lastFc.valid_at[offset];
+      return iso ? clockLabel(iso) : `+${offset}h`;
+    };
+
     // Maps the verdict to a state name + sets the single live accent. Flood NEVER
     // recolours the verdict (red is reserved for the flood line + water). Also
     // toggles the falling-rain enhancement on the "now" state only.
@@ -243,7 +258,11 @@ const defaultIdx = defaultLocality
         state = "now";
         setState("state-now");
         elVerdict.textContent = "Raining now";
-        elSub.textContent = `~${v.peakMm} mm·h⁻¹ peak · next ${horizon}h`;
+        // "till when": show the easing time if the block ends in-window, else say
+        // it carries on — never invent a stop time we can't actually see.
+        elSub.textContent = v.stillRaining
+          ? `still raining through ~${horizon}h · ~${v.peakMm} mm·h⁻¹ peak`
+          : `easing by ~${clockAt(v.endsInHrs)} · ~${v.peakMm} mm·h⁻¹ peak`;
         app.style.setProperty("--accent", mixHex(ACCENT.now, ACCENT.flood, (v.peakMm - 1) / 8));
       } else if (v.willRain) {
         state = "incoming";
@@ -251,7 +270,9 @@ const defaultIdx = defaultLocality
         elVerdict.innerHTML = v.startsInHrs <= 1
           ? `Rain <em>within the hour.</em>`
           : `Rain in about <em>~${v.startsInHrs}h.</em>`;
-        elSub.textContent = `peaks ~${v.peakMm} mm·h⁻¹ · next ${horizon}h`;
+        elSub.textContent = v.stillRaining
+          ? `~${clockAt(v.startsInHrs)} onward, through ~${horizon}h · ~${v.peakMm} mm·h⁻¹`
+          : `rain ~${clockAt(v.startsInHrs)}–${clockAt(v.endsInHrs)} · ~${v.peakMm} mm·h⁻¹`;
         app.style.setProperty("--accent", ACCENT.incoming);
       } else {
         state = "dry";

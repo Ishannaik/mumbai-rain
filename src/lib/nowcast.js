@@ -43,9 +43,13 @@ export function predict(model, feats) {
 }
 
 // Roll the model across the next `horizonHrs` forecast hours and summarise.
-// Returns { willRain, startsInHrs, peakMm, prob, type, horizon }:
+// Returns { willRain, startsInHrs, endsInHrs, stillRaining, peakMm, prob, type, horizon }:
 //   - willRain:     true if rain is called within the window.
 //   - startsInHrs:  0 = raining this hour, 1 = next hour, … null if dry.
+//   - endsInHrs:    offset (h) when the first rain block goes dry again, or null
+//                   if it's still raining at the end of the window.
+//   - stillRaining: true if rain is called but never stops within the window
+//                   (so the UI says "through the next Nh", not a fake end time).
 //   - peakMm:       highest rain intensity (mm/h) in the window, one decimal.
 //                   For a logistic model — which emits a probability, not mm —
 //                   this is the peak forecast best_match rate (the honest
@@ -58,6 +62,7 @@ export function predict(model, feats) {
 export function verdict(model, forecast, nowHour, recentRain, horizonHrs = HORIZON_HRS) {
   const isLogistic = model.type === "logistic";
   let startsInHrs = null;
+  let endsInHrs = null; // first dry hour after rain begins (the "till when")
   let peakMm = 0;   // intensity reading (mm/h)
   let peakProb = 0; // logistic confidence
   const horizon = Math.min(horizonHrs, forecast.valid_at.length);
@@ -85,11 +90,18 @@ export function verdict(model, forecast, nowHour, recentRain, horizonHrs = HORIZ
       raining = out >= RAIN_THRESHOLD_MM;
     }
     if (raining && startsInHrs === null) startsInHrs = i;
+    // First dry hour after rain has begun closes the first block — that's the
+    // "till when". Only the first block: rain can flicker back later in a long
+    // window, and a nowcast shouldn't promise the gap is the end of everything.
+    if (startsInHrs !== null && endsInHrs === null && !raining) endsInHrs = i;
   }
 
+  const willRain = startsInHrs !== null;
   return {
-    willRain: startsInHrs !== null,
+    willRain,
     startsInHrs,
+    endsInHrs,
+    stillRaining: willRain && endsInHrs === null,
     peakMm: Math.round(peakMm * 10) / 10,
     prob: isLogistic ? Math.round(peakProb * 100) / 100 : null,
     type: isLogistic ? "logistic" : "linear",
