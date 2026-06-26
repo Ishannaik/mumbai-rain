@@ -1,430 +1,359 @@
 ---
-// week.astro — the 7-day outlook. A standalone Monsoon-Almanac page (no Now-page
-// island, no shared layout): it reuses the global tokens from almanac.css and the
-// same <head> + masthead, then client-fetches Open-Meteo's DAILY block and renders
-// a calm newsprint ledger — one row per day, a rain bar as data-ink, the wettest
-// day marked. Honest by design: daily totals are for planning, not timing — the
-// caption sends you to Now for the live, calibrated next-2h call.
+// week.astro — the 7-day outlook. Uses the shared section shell (Page.astro) for
+// the <head> + masthead + nav + footer wrapper, then client-fetches Open-Meteo's
+// DAILY block and renders a calm newsprint ledger — one row per day, a rain bar as
+// data-ink, the wettest day marked. Honest by design: daily totals are for
+// planning, not timing — the caption sends you to Now for the live next-2h call.
 //
 // NOTE: the seven rows are injected client-side (live data), so their CSS lives in
 // :global() blocks — Astro's default scoping only tags build-time markup, never
 // runtime-created nodes. The static shell stays plainly scoped.
-import "../styles/almanac.css";
+import Page from "../layouts/Page.astro";
 
 const title = "पाऊस · Mumbai 7-day rain outlook";
 const description =
   "The seven-day rain outlook for Mumbai — daily rainfall totals, chance of rain, and high/low temperatures. For the live next-2-hour nowcast at your exact spot, see the Now page.";
-const canonical = new URL("/week", Astro.site).href;
 ---
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>{title}</title>
-  <meta name="description" content={description} />
-  <link rel="canonical" href={canonical} />
-  <meta name="theme-color" content="#dde2dc" />
-  <meta name="color-scheme" content="light only" />
-  <meta name="darkreader-lock" />
+<Page title={title} description={description} canonicalPath="/week" active="week">
+  <section class="page-head">
+    <p class="eyebrow">Seven-day outlook</p>
+    <h1 class="page-title">The week in rain</h1>
+    <p class="place"><span id="place">Colaba</span> · daily totals, IST</p>
+  </section>
 
-  <!-- Open Graph / social -->
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content={title} />
-  <meta property="og:description" content={description} />
-  <meta property="og:url" content={canonical} />
-  <meta name="twitter:card" content="summary" />
+  <!-- The ledger. Static content is a calm reading state; the script swaps in the
+       seven rows (or a calm error). aria-live announces the swap to screen readers. -->
+  <div class="week" id="week" aria-live="polite" aria-busy="true">
+    <p class="week-status" role="status">Reading the seven-day outlook…</p>
+  </div>
 
-  <!-- Same four faces as the Almanac shell, one combined request. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,600;9..144,0,900;9..144,1,600&family=Newsreader:ital,opsz@1,18&family=IBM+Plex+Mono:wght@400;500;600&family=Tiro+Devanagari+Marathi&display=swap"
-    rel="stylesheet"
-  />
-</head>
-<body>
-  <main class="sheet">
-    <!-- Masthead: the constant Marathi anchor + section nav (this page = Week). -->
-    <header class="masthead">
-      <span class="anchor" lang="mr">पाऊस</span>
-      <nav class="topnav" aria-label="Sections">
-        <a href="/">Now</a>
-        <a href="/week" aria-current="page">Week</a>
-        <a href="/air">Air</a>
-        <a href="/scoreboard">Scoreboard</a>
-        <a href="/about">About</a>
-      </nav>
-    </header>
+  <p class="week-note">
+    Daily totals from Open-Meteo's model blend — good for <em>planning the week</em>,
+    not for exact timing. For the live, calibrated call on the next two hours at your
+    spot, check <a href="/">Now</a>.
+  </p>
 
-    <section class="page-head">
-      <p class="eyebrow">Seven-day outlook</p>
-      <h1 class="page-title">The week in rain</h1>
-      <p class="place"><span id="place">Colaba</span> · daily totals, IST</p>
-    </section>
+  <footer slot="footer" class="foot">
+    <p class="honesty">Seven-day daily totals · timezone IST</p>
+    <p class="attrib"><a href="https://open-meteo.com/" rel="noopener">Weather data by Open-Meteo.com</a></p>
+  </footer>
+</Page>
 
-    <!-- The ledger. Static content is a calm reading state; the script swaps in the
-         seven rows (or a calm error). aria-live announces the swap to screen readers. -->
-    <div class="week" id="week" aria-live="polite" aria-busy="true">
-      <p class="week-status" role="status">Reading the seven-day outlook…</p>
-    </div>
+<style>
+  /* Container + section nav now come from Page.astro / almanac.css (the .topnav
+     tokens are global). Only this page's unique content is styled below. */
 
-    <p class="week-note">
-      Daily totals from Open-Meteo's model blend — good for <em>planning the week</em>,
-      not for exact timing. For the live, calibrated call on the next two hours at your
-      spot, check <a href="/">Now</a>.
-    </p>
+  .page-head { display: flex; flex-direction: column; gap: 6px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+    letter-spacing: .18em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .page-title {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 900; font-variation-settings: "opsz" 144;
+    font-size: clamp(2.1rem, 9vw, 3.3rem); line-height: .95;
+    letter-spacing: -.02em; color: var(--ink); text-wrap: balance;
+  }
+  .place {
+    font-family: "IBM Plex Mono", monospace; font-size: .8rem;
+    color: var(--ink-soft); font-variant-numeric: tabular-nums; letter-spacing: .01em;
+  }
 
-    <footer class="foot">
-      <p class="honesty">Seven-day daily totals · timezone IST</p>
-      <p class="attrib"><a href="https://open-meteo.com/" rel="noopener">Weather data by Open-Meteo.com</a></p>
-    </footer>
-  </main>
+  .week { min-height: 9rem; }
+  .week-status {
+    padding: var(--s-5) 0; border-top: 1px solid var(--rule);
+    font-family: "Newsreader", Georgia, serif; font-style: italic;
+    font-size: 1.05rem; color: var(--ink-soft);
+  }
 
-  <style>
-    /* ===== static shell (plain scoped) ============================== */
-    /* mirrors #app's phone-width "ticket", a touch wider to let the ledger
-       breathe; no rising-water gauge on this page. */
-    .sheet {
-      position: relative; z-index: 1;
-      width: min(92vw, 33rem); margin: 0 auto;
-      min-height: 100svh;
-      display: flex; flex-direction: column; gap: var(--s-5);
-      padding:
-        max(var(--s-5), env(safe-area-inset-top))
-        max(var(--s-5), env(safe-area-inset-right))
-        max(var(--s-5), env(safe-area-inset-bottom))
-        max(var(--s-5), env(safe-area-inset-left));
+  .week-note {
+    margin-top: auto;
+    font-family: "Newsreader", Georgia, serif; font-style: italic;
+    font-size: 1.02rem; line-height: 1.5; color: var(--ink-soft);
+    border-top: 1px solid var(--rule); padding-top: var(--s-4);
+  }
+  .week-note em { font-style: normal; color: var(--ink); }
+  .week-note a {
+    font-style: normal; color: var(--radar-rain);
+    text-decoration-thickness: 1px; text-underline-offset: 2px;
+  }
+  .week-note a:hover, .week-note a:focus-visible { color: var(--ink); }
+
+  /* ===== the ledger (runtime-injected → :global) ================== */
+  :global(.days) { list-style: none; margin: 0; padding: 0; }
+
+  :global(.day) {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "when temp"
+      "sub  sub"
+      "rain rain";
+    column-gap: var(--s-4); row-gap: 7px;
+    padding: var(--s-4) 0 var(--s-4) 14px;   /* 14px left gutter holds the wettest tick */
+    border-top: 1px solid var(--rule);
+  }
+
+  :global(.day-when) { grid-area: when; display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+  :global(.day-dow) {
+    font-family: "Fraunces", Georgia, serif; font-weight: 600;
+    font-variation-settings: "opsz" 40;
+    font-size: 1.22rem; line-height: 1; color: var(--ink);
+  }
+  :global(.tag) {
+    flex: none; align-self: center; line-height: 1;
+    font-family: "IBM Plex Mono", monospace; font-size: .56rem;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--radar-rain);
+    border: 1px solid color-mix(in srgb, var(--radar-rain) 42%, transparent);
+    border-radius: 999px; padding: 2px 7px;
+  }
+
+  :global(.day-temp) {
+    grid-area: temp; justify-self: end; align-self: baseline; white-space: nowrap;
+    font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 1rem;
+  }
+  :global(.t-hi) { color: var(--ink); font-weight: 500; }
+  :global(.t-sep) { color: var(--rule); margin: 0 3px; }
+  :global(.t-lo) { color: var(--ink-soft); }
+
+  :global(.day-sub) { grid-area: sub; display: flex; align-items: baseline; min-width: 0; }
+  :global(.day-date) {
+    flex: none;
+    font-family: "IBM Plex Mono", monospace; font-size: .66rem;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  :global(.day-cond) {
+    min-width: 0;        /* let the ellipsis trigger inside the flex row */
+    font-family: "Newsreader", Georgia, serif; font-style: italic;
+    font-size: .94rem; color: var(--ink-soft);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  :global(.day-cond::before) { content: "·"; margin: 0 9px; color: var(--rule); font-style: normal; }
+
+  :global(.day-rain) { grid-area: rain; display: flex; align-items: center; gap: var(--s-4); }
+  :global(.bar) {
+    flex: 1 1 auto; height: 6px; min-width: 0;
+    background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--rule-soft); overflow: hidden;
+  }
+  :global(.bar-fill) {
+    display: block; height: 100%; width: 0; background: var(--radar-rain);
+    transition: width .55s cubic-bezier(.2,.7,.2,1);
+  }
+  :global(.day-figs) {
+    flex: none; display: flex; align-items: baseline; gap: 6px; white-space: nowrap;
+    font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: .8rem;
+  }
+  :global(.day-figs .mm) { color: var(--ink); }
+  :global(.day-figs .mm.zero) { color: var(--ink-soft); }
+  :global(.day-figs .mm .u) { color: var(--ink-soft); }
+  :global(.day-figs .sep) { color: var(--rule); }
+  :global(.day-figs .pop) { color: var(--ink-soft); }
+
+  /* wettest day — radar-blue left tick (sits in the gutter) + emphasised total */
+  :global(.day.is-wettest) { box-shadow: inset 3px 0 0 var(--radar-rain); }
+  :global(.day.is-wettest .day-figs .mm) { color: var(--radar-rain); font-weight: 600; }
+  :global(.day.is-wettest .day-figs .mm .u) { color: color-mix(in srgb, var(--radar-rain) 70%, var(--ink-soft)); }
+
+  /* calm error state */
+  :global(.week-error) {
+    display: flex; flex-direction: column; gap: 6px;
+    padding: var(--s-5) 0; border-top: 1px solid var(--rule);
+  }
+  :global(.week-error-head) {
+    font-family: "Fraunces", Georgia, serif; font-weight: 600;
+    font-size: 1.5rem; line-height: 1.05; color: var(--ink);
+  }
+  :global(.week-error-sub) {
+    font-family: "IBM Plex Mono", monospace; font-size: .8rem; color: var(--ink-soft);
+  }
+
+  :global(.vh) {
+    position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* motion: the only animation is the one-time bar grow — disabled under reduce */
+  @media (prefers-reduced-motion: reduce) {
+    :global(.bar-fill) { transition: none; }
+  }
+
+  /* tighten for small phones */
+  @media (max-width: 380px) {
+    :global(.day-dow) { font-size: 1.12rem; }
+    :global(.day-temp) { font-size: .94rem; }
+    :global(.day-figs) { font-size: .76rem; }
+    :global(.day-cond) { font-size: .88rem; }
+  }
+</style>
+
+<script>
+  // Standalone client island for the Week page: one keyless Open-Meteo DAILY fetch,
+  // rendered as the newsprint ledger. No dependency on the Now page or its island.
+  const COLABA = { lat: 18.9067, lon: 72.8147, name: "Colaba" };
+  const API = "https://api.open-meteo.com/v1/forecast";
+
+  const weekEl = document.getElementById("week");
+  const placeEl = document.getElementById("place");
+  const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  // WMO weather codes → short, lowercase almanac voice. (Snow can't happen in
+  // Mumbai, but it's mapped anyway so a stray code never renders blank.)
+  const SKY = {
+    0: "clear", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
+    45: "fog", 48: "rime fog",
+    51: "light drizzle", 53: "drizzle", 55: "heavy drizzle",
+    56: "freezing drizzle", 57: "freezing drizzle",
+    61: "light rain", 63: "rain", 65: "heavy rain",
+    66: "freezing rain", 67: "freezing rain",
+    71: "light snow", 73: "snow", 75: "heavy snow", 77: "snow grains",
+    80: "light showers", 81: "rain showers", 82: "heavy showers",
+    85: "snow showers", 86: "snow showers",
+    95: "thunderstorm", 96: "storm, hail", 99: "storm, hail",
+  };
+  const sky = (code) => (code != null && SKY[code]) || "—";
+
+  // Build {dow, mon, day} from a plain "YYYY-MM-DD". Constructed via numeric args
+  // → a LOCAL date for that calendar day, so getDay() gives the right weekday
+  // without any UTC-parse off-by-one.
+  function parts(iso) {
+    const [y, m, d] = String(iso).split("-").map(Number);
+    const dt = new Date(y, (m || 1) - 1, d || 1);
+    return { dow: DOW[dt.getDay()], mon: MON[(m || 1) - 1], day: d };
+  }
+
+  // --- resolve the spot: ?lat=&lon=&name= override, else Colaba ---
+  let loc = { ...COLABA };
+  try {
+    const p = new URLSearchParams(location.search);
+    const qlat = parseFloat(p.get("lat"));
+    const qlon = parseFloat(p.get("lon"));
+    if (Number.isFinite(qlat) && Number.isFinite(qlon) &&
+        Math.abs(qlat) <= 90 && Math.abs(qlon) <= 180) {
+      const qn = (p.get("name") || "").trim();
+      loc = { lat: qlat, lon: qlon, name: qn ? qn.slice(0, 48) : "Your spot" };
     }
+  } catch (_) { /* malformed query → keep Colaba */ }
+  placeEl.textContent = loc.name;   // textContent → safe even with a hostile ?name
 
-    /* section nav — IBM Plex Mono, understated; current = full ink + underline.
-       Values kept in lockstep with the other pages' masthead nav (it's the one
-       element identical on every page) so tabs don't shift when navigating. */
-    .topnav {
-      display: flex; flex-wrap: wrap; align-items: baseline; gap: .45rem 1rem;
-      font-family: "IBM Plex Mono", monospace; font-size: .7rem; letter-spacing: .06em;
-    }
-    .topnav a { color: var(--ink-soft); text-decoration: none; padding: 2px 0; transition: color .2s ease; }
-    .topnav a:hover { color: var(--ink); }
-    .topnav a[aria-current="page"] {
-      color: var(--ink);
-      text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px;
-    }
-    .topnav a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  function showError(head, sub) {
+    weekEl.setAttribute("aria-busy", "false");
+    const h = document.createElement("p"); h.className = "week-error-head"; h.textContent = head;
+    const s = document.createElement("p"); s.className = "week-error-sub"; s.textContent = sub;
+    const box = document.createElement("div"); box.className = "week-error";
+    box.append(h, s);
+    weekEl.replaceChildren(box);
+  }
 
-    .page-head { display: flex; flex-direction: column; gap: 6px; }
-    .eyebrow {
-      font-family: "IBM Plex Mono", monospace; font-size: .62rem;
-      letter-spacing: .18em; text-transform: uppercase; color: var(--ink-soft);
-    }
-    .page-title {
-      font-family: "Fraunces", Georgia, serif;
-      font-weight: 900; font-variation-settings: "opsz" 144;
-      font-size: clamp(2.1rem, 9vw, 3.3rem); line-height: .95;
-      letter-spacing: -.02em; color: var(--ink); text-wrap: balance;
-    }
-    .place {
-      font-family: "IBM Plex Mono", monospace; font-size: .8rem;
-      color: var(--ink-soft); font-variant-numeric: tabular-nums; letter-spacing: .01em;
-    }
+  function rowHTML(d, i, maxMm, wettest) {
+    const p = parts(d.time[i]);
+    const mm = (d.precipitation_sum || [])[i] ?? 0;
+    const isZero = mm < 0.05;
+    const mmTxt = isZero ? "0" : mm.toFixed(1);
+    const pct = (maxMm > 0 && !isZero) ? Math.max(4, Math.round((mm / maxMm) * 100)) : 0;
 
-    .week { min-height: 9rem; }
-    .week-status {
-      padding: var(--s-5) 0; border-top: 1px solid var(--rule);
-      font-family: "Newsreader", Georgia, serif; font-style: italic;
-      font-size: 1.05rem; color: var(--ink-soft);
-    }
+    const pv = (d.precipitation_probability_max || [])[i];
+    const popTxt = (pv == null) ? "—" : pv + "%";
 
-    .week-note {
-      margin-top: auto;
-      font-family: "Newsreader", Georgia, serif; font-style: italic;
-      font-size: 1.02rem; line-height: 1.5; color: var(--ink-soft);
-      border-top: 1px solid var(--rule); padding-top: var(--s-4);
-    }
-    .week-note em { font-style: normal; color: var(--ink); }
-    .week-note a {
-      font-style: normal; color: var(--radar-rain);
-      text-decoration-thickness: 1px; text-underline-offset: 2px;
-    }
-    .week-note a:hover, .week-note a:focus-visible { color: var(--ink); }
+    const hRaw = (d.temperature_2m_max || [])[i];
+    const lRaw = (d.temperature_2m_min || [])[i];
+    const hv = (hRaw == null) ? null : Math.round(hRaw);
+    const lv = (lRaw == null) ? null : Math.round(lRaw);
+    const hiTxt = (hv == null) ? "—" : hv + "°";
+    const loTxt = (lv == null) ? "—" : lv + "°";
 
-    /* ===== the ledger (runtime-injected → :global) ================== */
-    :global(.days) { list-style: none; margin: 0; padding: 0; }
+    const code = (d.weather_code || [])[i];
+    const isWettest = (i === wettest);
 
-    :global(.day) {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      grid-template-areas:
-        "when temp"
-        "sub  sub"
-        "rain rain";
-      column-gap: var(--s-4); row-gap: 7px;
-      padding: var(--s-4) 0 var(--s-4) 14px;   /* 14px left gutter holds the wettest tick */
-      border-top: 1px solid var(--rule);
-    }
+    return (
+      '<li class="day' + (isWettest ? " is-wettest" : "") + '">' +
+        '<div class="day-when">' +
+          '<span class="day-dow">' + (i === 0 ? "Today" : p.dow) + "</span>" +
+          (isWettest ? '<span class="tag">wettest</span>' : "") +
+        "</div>" +
+        '<div class="day-temp">' +
+          '<span aria-hidden="true"><span class="t-hi">' + hiTxt + '</span><span class="t-sep">/</span><span class="t-lo">' + loTxt + "</span></span>" +
+          '<span class="vh">High ' + (hv == null ? "unknown" : hv) + ", low " + (lv == null ? "unknown" : lv) + " degrees Celsius</span>" +
+        "</div>" +
+        '<p class="day-sub">' +
+          '<span class="day-date">' + p.mon + " " + p.day + "</span>" +
+          '<span class="day-cond">' + sky(code) + "</span>" +
+        "</p>" +
+        '<div class="day-rain">' +
+          '<span class="bar" aria-hidden="true"><span class="bar-fill" data-w="' + pct + '" style="width:' + (REDUCE ? pct : 0) + '%"></span></span>' +
+          '<span class="day-figs">' +
+            '<span class="mm' + (isZero ? " zero" : "") + '">' + mmTxt + '<span class="u"> mm</span></span>' +
+            '<span class="sep" aria-hidden="true">·</span>' +
+            '<span class="pop">' + popTxt + "</span>" +
+            '<span class="vh"> chance of rain</span>' +
+          "</span>" +
+        "</div>" +
+      "</li>"
+    );
+  }
 
-    :global(.day-when) { grid-area: when; display: flex; align-items: baseline; gap: 9px; min-width: 0; }
-    :global(.day-dow) {
-      font-family: "Fraunces", Georgia, serif; font-weight: 600;
-      font-variation-settings: "opsz" 40;
-      font-size: 1.22rem; line-height: 1; color: var(--ink);
+  function render(data) {
+    const d = data && data.daily;
+    if (!d || !Array.isArray(d.time) || !d.time.length) {
+      showError("No outlook right now", "Open-Meteo has no daily data for this spot yet. Try again later.");
+      return;
     }
-    :global(.tag) {
-      flex: none; align-self: center; line-height: 1;
-      font-family: "IBM Plex Mono", monospace; font-size: .56rem;
-      letter-spacing: .14em; text-transform: uppercase; color: var(--radar-rain);
-      border: 1px solid color-mix(in srgb, var(--radar-rain) 42%, transparent);
-      border-radius: 999px; padding: 2px 7px;
-    }
+    const n = d.time.length;
+    const sums = d.precipitation_sum || [];
 
-    :global(.day-temp) {
-      grid-area: temp; justify-self: end; align-self: baseline; white-space: nowrap;
-      font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: 1rem;
+    // Wettest day = max daily total (only marked if it actually rains somewhere).
+    let wettest = -1, wettestMm = 0, maxMm = 0;
+    for (let i = 0; i < n; i++) {
+      const mm = sums[i] ?? 0;
+      if (mm > maxMm) maxMm = mm;
+      if (mm > wettestMm) { wettestMm = mm; wettest = i; }
     }
-    :global(.t-hi) { color: var(--ink); font-weight: 500; }
-    :global(.t-sep) { color: var(--rule); margin: 0 3px; }
-    :global(.t-lo) { color: var(--ink-soft); }
+    if (wettestMm <= 0) wettest = -1;
 
-    :global(.day-sub) { grid-area: sub; display: flex; align-items: baseline; min-width: 0; }
-    :global(.day-date) {
-      flex: none;
-      font-family: "IBM Plex Mono", monospace; font-size: .66rem;
-      letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft);
-      font-variant-numeric: tabular-nums;
+    let rows = "";
+    for (let i = 0; i < n; i++) rows += rowHTML(d, i, maxMm, wettest);
+
+    const ol = document.createElement("ol");
+    ol.className = "days";
+    ol.innerHTML = rows;
+    weekEl.setAttribute("aria-busy", "false");
+    weekEl.replaceChildren(ol);
+
+    // One-time bar grow: bars render at 0, then ease to their share next frame.
+    // Skipped under reduced motion (they're already painted at full width there).
+    if (!REDUCE) {
+      requestAnimationFrame(() => {
+        ol.querySelectorAll(".bar-fill").forEach((el) => { el.style.width = (el.dataset.w || 0) + "%"; });
+      });
     }
-    :global(.day-cond) {
-      min-width: 0;        /* let the ellipsis trigger inside the flex row */
-      font-family: "Newsreader", Georgia, serif; font-style: italic;
-      font-size: .94rem; color: var(--ink-soft);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  async function load() {
+    if (!navigator.onLine) {
+      showError("You're offline", "Reconnect, then refresh to see the week.");
+      return;
     }
-    :global(.day-cond::before) { content: "·"; margin: 0 9px; color: var(--rule); font-style: normal; }
-
-    :global(.day-rain) { grid-area: rain; display: flex; align-items: center; gap: var(--s-4); }
-    :global(.bar) {
-      flex: 1 1 auto; height: 6px; min-width: 0;
-      background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--rule-soft); overflow: hidden;
-    }
-    :global(.bar-fill) {
-      display: block; height: 100%; width: 0; background: var(--radar-rain);
-      transition: width .55s cubic-bezier(.2,.7,.2,1);
-    }
-    :global(.day-figs) {
-      flex: none; display: flex; align-items: baseline; gap: 6px; white-space: nowrap;
-      font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; font-size: .8rem;
-    }
-    :global(.day-figs .mm) { color: var(--ink); }
-    :global(.day-figs .mm.zero) { color: var(--ink-soft); }
-    :global(.day-figs .mm .u) { color: var(--ink-soft); }
-    :global(.day-figs .sep) { color: var(--rule); }
-    :global(.day-figs .pop) { color: var(--ink-soft); }
-
-    /* wettest day — radar-blue left tick (sits in the gutter) + emphasised total */
-    :global(.day.is-wettest) { box-shadow: inset 3px 0 0 var(--radar-rain); }
-    :global(.day.is-wettest .day-figs .mm) { color: var(--radar-rain); font-weight: 600; }
-    :global(.day.is-wettest .day-figs .mm .u) { color: color-mix(in srgb, var(--radar-rain) 70%, var(--ink-soft)); }
-
-    /* calm error state */
-    :global(.week-error) {
-      display: flex; flex-direction: column; gap: 6px;
-      padding: var(--s-5) 0; border-top: 1px solid var(--rule);
-    }
-    :global(.week-error-head) {
-      font-family: "Fraunces", Georgia, serif; font-weight: 600;
-      font-size: 1.5rem; line-height: 1.05; color: var(--ink);
-    }
-    :global(.week-error-sub) {
-      font-family: "IBM Plex Mono", monospace; font-size: .8rem; color: var(--ink-soft);
-    }
-
-    :global(.vh) {
-      position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
-      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-    }
-
-    /* motion: the only animation is the one-time bar grow — disabled under reduce */
-    @media (prefers-reduced-motion: reduce) {
-      :global(.bar-fill) { transition: none; }
-    }
-
-    /* tighten for small phones */
-    @media (max-width: 380px) {
-      :global(.day-dow) { font-size: 1.12rem; }
-      :global(.day-temp) { font-size: .94rem; }
-      :global(.day-figs) { font-size: .76rem; }
-      :global(.day-cond) { font-size: .88rem; }
-    }
-  </style>
-
-  <script>
-    // Standalone client island for the Week page: one keyless Open-Meteo DAILY fetch,
-    // rendered as the newsprint ledger. No dependency on the Now page or its island.
-    const COLABA = { lat: 18.9067, lon: 72.8147, name: "Colaba" };
-    const API = "https://api.open-meteo.com/v1/forecast";
-
-    const weekEl = document.getElementById("week");
-    const placeEl = document.getElementById("place");
-    const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-    // WMO weather codes → short, lowercase almanac voice. (Snow can't happen in
-    // Mumbai, but it's mapped anyway so a stray code never renders blank.)
-    const SKY = {
-      0: "clear", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
-      45: "fog", 48: "rime fog",
-      51: "light drizzle", 53: "drizzle", 55: "heavy drizzle",
-      56: "freezing drizzle", 57: "freezing drizzle",
-      61: "light rain", 63: "rain", 65: "heavy rain",
-      66: "freezing rain", 67: "freezing rain",
-      71: "light snow", 73: "snow", 75: "heavy snow", 77: "snow grains",
-      80: "light showers", 81: "rain showers", 82: "heavy showers",
-      85: "snow showers", 86: "snow showers",
-      95: "thunderstorm", 96: "storm, hail", 99: "storm, hail",
-    };
-    const sky = (code) => (code != null && SKY[code]) || "—";
-
-    // Build {dow, mon, day} from a plain "YYYY-MM-DD". Constructed via numeric args
-    // → a LOCAL date for that calendar day, so getDay() gives the right weekday
-    // without any UTC-parse off-by-one.
-    function parts(iso) {
-      const [y, m, d] = String(iso).split("-").map(Number);
-      const dt = new Date(y, (m || 1) - 1, d || 1);
-      return { dow: DOW[dt.getDay()], mon: MON[(m || 1) - 1], day: d };
-    }
-
-    // --- resolve the spot: ?lat=&lon=&name= override, else Colaba ---
-    let loc = { ...COLABA };
     try {
-      const p = new URLSearchParams(location.search);
-      const qlat = parseFloat(p.get("lat"));
-      const qlon = parseFloat(p.get("lon"));
-      if (Number.isFinite(qlat) && Number.isFinite(qlon) &&
-          Math.abs(qlat) <= 90 && Math.abs(qlon) <= 180) {
-        const qn = (p.get("name") || "").trim();
-        loc = { lat: qlat, lon: qlon, name: qn ? qn.slice(0, 48) : "Your spot" };
-      }
-    } catch (_) { /* malformed query → keep Colaba */ }
-    placeEl.textContent = loc.name;   // textContent → safe even with a hostile ?name
-
-    function showError(head, sub) {
-      weekEl.setAttribute("aria-busy", "false");
-      const h = document.createElement("p"); h.className = "week-error-head"; h.textContent = head;
-      const s = document.createElement("p"); s.className = "week-error-sub"; s.textContent = sub;
-      const box = document.createElement("div"); box.className = "week-error";
-      box.append(h, s);
-      weekEl.replaceChildren(box);
+      const url = API +
+        "?latitude=" + loc.lat + "&longitude=" + loc.lon +
+        "&daily=weather_code,precipitation_sum,precipitation_probability_max,temperature_2m_max,temperature_2m_min" +
+        "&timezone=Asia%2FKolkata&forecast_days=7";
+      const r = await fetch(url);
+      if (!r.ok) throw new Error("Open-Meteo " + r.status);
+      render(await r.json());
+    } catch (err) {
+      console.error(err);
+      showError("Can't reach the forecast", "Check your connection, then refresh to try again.");
     }
+  }
 
-    function rowHTML(d, i, maxMm, wettest) {
-      const p = parts(d.time[i]);
-      const mm = (d.precipitation_sum || [])[i] ?? 0;
-      const isZero = mm < 0.05;
-      const mmTxt = isZero ? "0" : mm.toFixed(1);
-      const pct = (maxMm > 0 && !isZero) ? Math.max(4, Math.round((mm / maxMm) * 100)) : 0;
+  // Auto-retry once connectivity returns (covers the offline-on-load case).
+  window.addEventListener("online", () => {
+    if (weekEl.getAttribute("aria-busy") !== "false" || weekEl.querySelector(".week-error")) load();
+  });
 
-      const pv = (d.precipitation_probability_max || [])[i];
-      const popTxt = (pv == null) ? "—" : pv + "%";
-
-      const hRaw = (d.temperature_2m_max || [])[i];
-      const lRaw = (d.temperature_2m_min || [])[i];
-      const hv = (hRaw == null) ? null : Math.round(hRaw);
-      const lv = (lRaw == null) ? null : Math.round(lRaw);
-      const hiTxt = (hv == null) ? "—" : hv + "°";
-      const loTxt = (lv == null) ? "—" : lv + "°";
-
-      const code = (d.weather_code || [])[i];
-      const isWettest = (i === wettest);
-
-      return (
-        '<li class="day' + (isWettest ? " is-wettest" : "") + '">' +
-          '<div class="day-when">' +
-            '<span class="day-dow">' + (i === 0 ? "Today" : p.dow) + "</span>" +
-            (isWettest ? '<span class="tag">wettest</span>' : "") +
-          "</div>" +
-          '<div class="day-temp">' +
-            '<span aria-hidden="true"><span class="t-hi">' + hiTxt + '</span><span class="t-sep">/</span><span class="t-lo">' + loTxt + "</span></span>" +
-            '<span class="vh">High ' + (hv == null ? "unknown" : hv) + ", low " + (lv == null ? "unknown" : lv) + " degrees Celsius</span>" +
-          "</div>" +
-          '<p class="day-sub">' +
-            '<span class="day-date">' + p.mon + " " + p.day + "</span>" +
-            '<span class="day-cond">' + sky(code) + "</span>" +
-          "</p>" +
-          '<div class="day-rain">' +
-            '<span class="bar" aria-hidden="true"><span class="bar-fill" data-w="' + pct + '" style="width:' + (REDUCE ? pct : 0) + '%"></span></span>' +
-            '<span class="day-figs">' +
-              '<span class="mm' + (isZero ? " zero" : "") + '">' + mmTxt + '<span class="u"> mm</span></span>' +
-              '<span class="sep" aria-hidden="true">·</span>' +
-              '<span class="pop">' + popTxt + "</span>" +
-              '<span class="vh"> chance of rain</span>' +
-            "</span>" +
-          "</div>" +
-        "</li>"
-      );
-    }
-
-    function render(data) {
-      const d = data && data.daily;
-      if (!d || !Array.isArray(d.time) || !d.time.length) {
-        showError("No outlook right now", "Open-Meteo has no daily data for this spot yet. Try again later.");
-        return;
-      }
-      const n = d.time.length;
-      const sums = d.precipitation_sum || [];
-
-      // Wettest day = max daily total (only marked if it actually rains somewhere).
-      let wettest = -1, wettestMm = 0, maxMm = 0;
-      for (let i = 0; i < n; i++) {
-        const mm = sums[i] ?? 0;
-        if (mm > maxMm) maxMm = mm;
-        if (mm > wettestMm) { wettestMm = mm; wettest = i; }
-      }
-      if (wettestMm <= 0) wettest = -1;
-
-      let rows = "";
-      for (let i = 0; i < n; i++) rows += rowHTML(d, i, maxMm, wettest);
-
-      const ol = document.createElement("ol");
-      ol.className = "days";
-      ol.innerHTML = rows;
-      weekEl.setAttribute("aria-busy", "false");
-      weekEl.replaceChildren(ol);
-
-      // One-time bar grow: bars render at 0, then ease to their share next frame.
-      // Skipped under reduced motion (they're already painted at full width there).
-      if (!REDUCE) {
-        requestAnimationFrame(() => {
-          ol.querySelectorAll(".bar-fill").forEach((el) => { el.style.width = (el.dataset.w || 0) + "%"; });
-        });
-      }
-    }
-
-    async function load() {
-      if (!navigator.onLine) {
-        showError("You're offline", "Reconnect, then refresh to see the week.");
-        return;
-      }
-      try {
-        const url = API +
-          "?latitude=" + loc.lat + "&longitude=" + loc.lon +
-          "&daily=weather_code,precipitation_sum,precipitation_probability_max,temperature_2m_max,temperature_2m_min" +
-          "&timezone=Asia%2FKolkata&forecast_days=7";
-        const r = await fetch(url);
-        if (!r.ok) throw new Error("Open-Meteo " + r.status);
-        render(await r.json());
-      } catch (err) {
-        console.error(err);
-        showError("Can't reach the forecast", "Check your connection, then refresh to try again.");
-      }
-    }
-
-    // Auto-retry once connectivity returns (covers the offline-on-load case).
-    window.addEventListener("online", () => {
-      if (weekEl.getAttribute("aria-busy") !== "false" || weekEl.querySelector(".week-error")) load();
-    });
-
-    load();
-  </script>
-</body>
-</html>
+  load();
+</script>

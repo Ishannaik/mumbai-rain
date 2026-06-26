@@ -1,0 +1,121 @@
+---
+// Page.astro — the shared shell for the SECTION pages (Week / Air / Scoreboard /
+// About). The Now page keeps its own richer shell (Almanac.astro); this one owns
+// the parts those four standalone pages used to each copy: the full <head>
+// (meta/OG/fonts/manifest, anti-dark-mode lock), the पाऊस masthead + section nav,
+// the centered "ticket" column they all sit in, and the service-worker
+// registration. Page content goes in the default <slot/>; the page-specific
+// footer goes in the named "footer" slot (each section's attribution differs).
+import "../styles/almanac.css";
+
+export interface Props {
+  title: string;
+  description: string;
+  /** Canonical path, e.g. "/week" — builds <link rel="canonical"> + og:url off Astro's `site`. */
+  canonicalPath: string;
+  /** Which section nav link is current. */
+  active: "now" | "week" | "air" | "scoreboard" | "about";
+}
+
+const { title, description, canonicalPath, active } = Astro.props;
+const canonical = new URL(canonicalPath, Astro.site).href;
+
+// Each section's centered column (the "ticket"). Same widths/gaps the pages used
+// when standalone, so nothing shifts; air also keeps its id + initial state class
+// (its island drives #air's className + --band) and Scoreboard/About run wider.
+const COLUMN = {
+  week:       { id: undefined, cls: "sheet" },
+  air:        { id: "air",     cls: "air is-loading" },
+  scoreboard: { id: undefined, cls: "sb" },
+  about:      { id: undefined, cls: "doc" },
+} as const;
+const col = COLUMN[active as keyof typeof COLUMN] ?? COLUMN.week;
+
+// Section nav — same five links on every page; the active one gets aria-current.
+const NAV = [
+  { key: "now",        href: "/",           label: "Now" },
+  { key: "week",       href: "/week",       label: "Week" },
+  { key: "air",        href: "/air",        label: "Air" },
+  { key: "scoreboard", href: "/scoreboard", label: "Scoreboard" },
+  { key: "about",      href: "/about",      label: "About" },
+];
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <link rel="canonical" href={canonical} />
+  <meta name="theme-color" content="#dde2dc" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="darkreader-lock" />
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Open Graph / social -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:url" content={canonical} />
+  <meta name="twitter:card" content="summary" />
+
+  <!-- The Monsoon Almanac's four faces, one combined request:
+       Fraunces (display verdict, incl. 600 for italic emphasis), Newsreader
+       italic (reading voice), IBM Plex Mono incl. 600 (instruments/data),
+       Tiro Devanagari Marathi (पाऊस anchor). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,600;9..144,0,900;9..144,1,600&family=Newsreader:ital,opsz@1,18&family=IBM+Plex+Mono:wght@400;500;600&family=Tiro+Devanagari+Marathi&display=swap"
+    rel="stylesheet"
+  />
+</head>
+<body>
+  <main id={col.id} class={col.cls}>
+    <!-- Masthead: the Marathi anchor (constant ink identity) + section nav. -->
+    <header class="masthead">
+      <span class="anchor" lang="mr">पाऊस</span>
+      <nav class="topnav" aria-label="Sections">
+        {NAV.map((n) => (
+          <a href={n.href} aria-current={active === n.key ? "page" : undefined}>{n.label}</a>
+        ))}
+      </nav>
+    </header>
+
+    <slot />
+
+    <slot name="footer" />
+  </main>
+
+  <!-- PWA: register the service worker (offline shell + last-forecast cache). -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+    }
+  </script>
+</body>
+</html>
+
+<style>
+  /* The centered "ticket" column shared by every section page. One rule; the
+     per-section width / gap / bottom-padding ride on custom properties so the
+     four variants (Week+Air 33rem · Scoreboard 46rem · About 44rem) stay DRY. */
+  .sheet, .air, .sb, .doc {
+    position: relative; z-index: 1;
+    width: min(92vw, var(--col-w)); margin: 0 auto;
+    min-height: 100svh;
+    display: flex; flex-direction: column; gap: var(--col-gap);
+    padding:
+      max(var(--s-5), env(safe-area-inset-top))
+      max(var(--s-5), env(safe-area-inset-right))
+      max(var(--col-pb), env(safe-area-inset-bottom))
+      max(var(--s-5), env(safe-area-inset-left));
+  }
+  .sheet, .air { --col-w: 33rem; --col-gap: var(--s-5); --col-pb: var(--s-5); }
+  .sb          { --col-w: 46rem; --col-gap: var(--s-6); --col-pb: var(--s-6); }
+  .doc         { --col-w: 44rem; --col-gap: var(--s-6); --col-pb: var(--s-6); }
+  .air         { --band: var(--ink-soft); }   /* live AQI accent; the island sets the hue */
+
+  @media (max-width: 380px) { .doc { --col-gap: var(--s-5); } }
+</style>

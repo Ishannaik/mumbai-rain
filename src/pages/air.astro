@@ -1,357 +1,289 @@
 ---
-// Air page — Mumbai air quality at the Almanac look. Standalone (no dependency on
-// the Now-page island): one keyless Open-Meteo air-quality fetch, client-side, in
-// a try/catch with a calm error state. Shows the current US AQI big in its standard
-// 6-band colour, the honest one-line health caption, PM2.5 / PM10, and a 24h sketch
-// (thin bars, one per hour, coloured by each hour's band; the "now" bar is lit + ink
-// capped). The AQI band keeps its semantic colour; everything else is the wet-newsprint
-// almanac palette. Colaba by default; ?lat=&lon= overrides the spot.
-import "../styles/almanac.css";
+// Air page — Mumbai air quality at the Almanac look. Uses the shared section shell
+// (Page.astro) for the <head> + masthead + nav + footer wrapper; the body is one
+// keyless Open-Meteo air-quality fetch, client-side, in a try/catch with a calm
+// error state. Shows the current US AQI big in its standard 6-band colour, the
+// honest one-line health caption, PM2.5 / PM10, and a 24h sketch (thin bars, one
+// per hour, coloured by each hour's band; the "now" bar is lit + ink capped). The
+// AQI band keeps its semantic colour; everything else is the wet-newsprint almanac
+// palette. Colaba by default; ?lat=&lon= overrides the spot.
+//
+// The island drives #air (the layout's <main> for this section): it sets the
+// className state + the --band accent there, so the layout keeps id="air".
+import Page from "../layouts/Page.astro";
 
 const title = "पाऊस · Mumbai air quality — live US AQI";
 const description =
   "Live US Air Quality Index for Mumbai — PM2.5, PM10, and today's hourly trend. " +
   "Free, keyless, modeled by Open-Meteo. Know the air before you step out.";
-const canonicalPath = "/air";
-const canonical = Astro.site ? new URL(canonicalPath, Astro.site).href : canonicalPath;
 ---
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>{title}</title>
-  <meta name="description" content={description} />
-  <link rel="canonical" href={canonical} />
-  <meta name="theme-color" content="#dde2dc" />
-  <meta name="color-scheme" content="light only" />
-  <meta name="darkreader-lock" />
+<Page title={title} description={description} canonicalPath="/air" active="air">
+  <!-- The reading. aria-live so the AQI is announced once it resolves. -->
+  <section class="air-reading" aria-live="polite">
+    <p class="air-eyebrow">Air quality · <b id="place">Colaba</b></p>
 
-  <!-- Open Graph / social -->
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content={title} />
-  <meta property="og:description" content={description} />
-  <meta property="og:url" content={canonical} />
-  <meta name="twitter:card" content="summary" />
-
-  <!-- Same four faces as the rest of the Almanac, one combined request:
-       Fraunces (display figure), Newsreader italic (reading voice), IBM Plex Mono
-       (instruments/data), Tiro Devanagari Marathi (पाऊस anchor). -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,600;9..144,0,900;9..144,1,600&family=Newsreader:ital,opsz@1,18&family=IBM+Plex+Mono:wght@400;500;600&family=Tiro+Devanagari+Marathi&display=swap"
-    rel="stylesheet"
-  />
-
-  <style>
-    /* ---- page container: the same centered "ticket" column as the Now page ---- */
-    .air {
-      --band: var(--ink-soft);                 /* live AQI accent; JS sets the band hue */
-      position: relative; z-index: 1;
-      width: min(92vw, 33rem); margin: 0 auto;
-      min-height: 100svh;
-      display: flex; flex-direction: column; gap: var(--s-5);
-      padding:
-        max(var(--s-5), env(safe-area-inset-top))
-        max(var(--s-5), env(safe-area-inset-right))
-        max(var(--s-5), env(safe-area-inset-bottom))
-        max(var(--s-5), env(safe-area-inset-left));
-    }
-
-    /* ---- section nav (masthead right) — understated mono ---- */
-    .topnav {
-      display: flex; flex-wrap: wrap; align-items: baseline;
-      gap: .45rem 1rem;
-      font-family: "IBM Plex Mono", monospace; font-size: .7rem;
-      letter-spacing: .06em;
-    }
-    .topnav a { color: var(--ink-soft); text-decoration: none; padding: 2px 0; transition: color .2s ease; }
-    .topnav a:hover { color: var(--ink); }
-    .topnav a[aria-current="page"] {
-      color: var(--ink);
-      text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px;
-    }
-    .topnav a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-
-    /* ---- the reading ---- */
-    .air-reading { display: flex; flex-direction: column; gap: var(--s-4); }
-    .air-eyebrow {
-      font-family: "IBM Plex Mono", monospace; font-size: .62rem;
-      letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft);
-    }
-    .air-eyebrow b { color: var(--ink); font-weight: 500; }
-
-    .aqi-block { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; }
-    .aqi-value {
-      font-family: "Fraunces", Georgia, serif; font-weight: 900;
-      font-variation-settings: "opsz" 144;
-      font-size: clamp(3.2rem, 16vw, 5.4rem); line-height: .88; letter-spacing: -.02em;
-      color: var(--band); font-variant-numeric: tabular-nums;
-    }
-    .aqi-meta { display: flex; flex-direction: column; gap: 7px; }
-    .aqi-unit {
-      font-family: "IBM Plex Mono", monospace; font-size: .62rem;
-      letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft);
-    }
-    .aqi-band { display: inline-flex; align-items: center; gap: .5ch; }
-    .aqi-dot {
-      flex: none; width: 11px; height: 11px; border-radius: 50%;
-      background: var(--band);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--band) 18%, transparent);
-    }
-    .aqi-band-name {
-      font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 400;
-      font-size: clamp(1.3rem, 5.4vw, 1.7rem); line-height: 1; color: var(--band);
-    }
-    .aqi-caption {
-      font-family: "Newsreader", Georgia, serif; font-style: italic;
-      font-size: 1.05rem; line-height: 1.45; color: var(--ink);
-      max-width: 34ch;
-    }
-
-    /* particulate ledger — rows reuse the global .details/.row; just mute the unit */
-    .air .row .unit { color: var(--ink-soft); }
-
-    /* ---- 24h sketch: thin band-coloured bars; the "now" bar lit + ink-capped ---- */
-    .spark { display: flex; flex-direction: column; gap: 8px; }
-    .air .spark[hidden] { display: none; }      /* beat .spark's display:flex (UA [hidden] would lose) */
-    .spark-cap {
-      display: flex; justify-content: space-between; gap: 1rem; align-items: baseline;
-      font-family: "IBM Plex Mono", monospace; font-size: .62rem;
-      letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft);
-    }
-    .spark-cap-note { letter-spacing: .04em; opacity: .8; }
-    .spark-plot { width: 100%; }
-    .spark-plot svg { display: block; width: 100%; height: 82px; }
-    .spark-axis {
-      display: flex; justify-content: space-between;
-      font-family: "IBM Plex Mono", monospace; font-size: .58rem;
-      letter-spacing: .03em; color: var(--ink-soft); opacity: .85;
-      font-variant-numeric: tabular-nums;
-    }
-
-    /* live colour eases between bands; never animates under reduced motion */
-    @media (prefers-reduced-motion: no-preference) {
-      .aqi-value, .aqi-band-name, .aqi-dot {
-        transition: color .45s ease, background-color .45s ease, box-shadow .45s ease;
-      }
-    }
-    @media (max-width: 380px) { .aqi-block { gap: var(--s-4); } }
-  </style>
-</head>
-<body>
-  <main id="air" class="air is-loading">
-    <!-- Masthead: the Marathi anchor (constant ink) + section nav. -->
-    <header class="masthead">
-      <span class="anchor" lang="mr">पाऊस</span>
-      <nav class="topnav" aria-label="Sections">
-        <a href="/">Now</a>
-        <a href="/week">Week</a>
-        <a href="/air" aria-current="page">Air</a>
-        <a href="/scoreboard">Scoreboard</a>
-        <a href="/about">About</a>
-      </nav>
-    </header>
-
-    <!-- The reading. aria-live so the AQI is announced once it resolves. -->
-    <section class="air-reading" aria-live="polite">
-      <p class="air-eyebrow">Air quality · <b id="place">Colaba</b></p>
-
-      <div class="aqi-block">
-        <span class="aqi-value" id="aqi-value">—</span>
-        <span class="aqi-meta">
-          <span class="aqi-unit">US AQI</span>
-          <span class="aqi-band">
-            <i class="aqi-dot" aria-hidden="true"></i>
-            <span class="aqi-band-name" id="band-name">Reading the air…</span>
-          </span>
+    <div class="aqi-block">
+      <span class="aqi-value" id="aqi-value">—</span>
+      <span class="aqi-meta">
+        <span class="aqi-unit">US AQI</span>
+        <span class="aqi-band">
+          <i class="aqi-dot" aria-hidden="true"></i>
+          <span class="aqi-band-name" id="band-name">Reading the air…</span>
         </span>
-      </div>
+      </span>
+    </div>
 
-      <p class="aqi-caption" id="aqi-caption">Fetching Mumbai’s latest air reading…</p>
-    </section>
+    <p class="aqi-caption" id="aqi-caption">Fetching Mumbai’s latest air reading…</p>
+  </section>
 
-    <!-- Particulates — quiet tabular ledger (global .details/.row). -->
-    <dl class="details">
-      <div class="row"><dt>pm2.5</dt><dd><span id="pm25">—</span> <span class="unit">µg/m³</span></dd></div>
-      <div class="row"><dt>pm10</dt><dd><span id="pm10">—</span> <span class="unit">µg/m³</span></dd></div>
-      <div class="row"><dt>as of</dt><dd id="asof">—</dd></div>
-    </dl>
+  <!-- Particulates — quiet tabular ledger (global .details/.row). -->
+  <dl class="details">
+    <div class="row"><dt>pm2.5</dt><dd><span id="pm25">—</span> <span class="unit">µg/m³</span></dd></div>
+    <div class="row"><dt>pm10</dt><dd><span id="pm10">—</span> <span class="unit">µg/m³</span></dd></div>
+    <div class="row"><dt>as of</dt><dd id="asof">—</dd></div>
+  </dl>
 
-    <!-- 24h AQI sketch (built by the island). -->
-    <figure class="spark" id="spark">
-      <figcaption class="spark-cap">
-        <span>Today · hourly US AQI</span>
-        <span class="spark-cap-note">lit bar = now</span>
-      </figcaption>
-      <div class="spark-plot" id="plot"></div>
-      <div class="spark-axis" id="axis" aria-hidden="true"></div>
-    </figure>
+  <!-- 24h AQI sketch (built by the island). -->
+  <figure class="spark" id="spark">
+    <figcaption class="spark-cap">
+      <span>Today · hourly US AQI</span>
+      <span class="spark-cap-note">lit bar = now</span>
+    </figcaption>
+    <div class="spark-plot" id="plot"></div>
+    <div class="spark-axis" id="axis" aria-hidden="true"></div>
+  </figure>
 
-    <footer class="foot">
-      <p class="honesty">Modeled estimate (CAMS) — not a ground-station reading.</p>
-      <p class="attrib"><a href="https://open-meteo.com/" rel="noopener">Air-quality data by Open-Meteo.com</a></p>
-    </footer>
-  </main>
+  <footer slot="footer" class="foot">
+    <p class="honesty">Modeled estimate (CAMS) — not a ground-station reading.</p>
+    <p class="attrib"><a href="https://open-meteo.com/" rel="noopener">Air-quality data by Open-Meteo.com</a></p>
+  </footer>
+</Page>
 
-  <script>
-    // --- US EPA AQI bands: semantic colour + honest one-line health caption.
-    // Hues are the recognizable green→maroon ramp, deepened just enough to stay
-    // legible on wet-newsprint paper. The band colour is the ONLY non-almanac ink.
-    const BANDS = [
-      { max: 50,  name: "Good",                           color: "#3f8f4f", caption: "Clean air — fine for everyone, indoors and out." },
-      { max: 100, name: "Moderate",                       color: "#a87d18", caption: "Acceptable — unusually sensitive people may notice it." },
-      { max: 150, name: "Unhealthy for Sensitive Groups", color: "#cf6f22", caption: "Sensitive groups — asthma, kids, the elderly — should ease outdoor effort." },
-      { max: 200, name: "Unhealthy",                      color: "#c0392b", caption: "Everyone may feel it — cut back on long or intense time outdoors." },
-      { max: 300, name: "Very Unhealthy",                 color: "#8a4196", caption: "Health alert — avoid prolonged exertion outdoors." },
-      { max: Infinity, name: "Hazardous",                 color: "#7e2233", caption: "Emergency — stay indoors and keep windows shut." },
-    ];
-    const bandFor = (a) => BANDS.find((b) => a <= b.max) || BANDS[BANDS.length - 1];
+<style>
+  /* Container (#air), masthead + section nav now come from Page.astro / almanac.css.
+     Only this page's unique reading is styled below. */
 
-    const air = document.getElementById("air");
-    const $ = (id) => document.getElementById(id);
+  /* ---- the reading ---- */
+  .air-reading { display: flex; flex-direction: column; gap: var(--s-4); }
+  .air-eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .air-eyebrow b { color: var(--ink); font-weight: 500; }
 
-    // Colaba by default; ?lat=&lon= overrides the spot.
-    const params = new URLSearchParams(location.search);
-    const qLat = parseFloat(params.get("lat"));
-    const qLon = parseFloat(params.get("lon"));
-    const hasOverride = Number.isFinite(qLat) && Number.isFinite(qLon);
-    const lat = hasOverride ? qLat : 18.9067;
-    const lon = hasOverride ? qLon : 72.8147;
-    const placeName = hasOverride ? "your spot" : "Colaba";
+  .aqi-block { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; }
+  .aqi-value {
+    font-family: "Fraunces", Georgia, serif; font-weight: 900;
+    font-variation-settings: "opsz" 144;
+    font-size: clamp(3.2rem, 16vw, 5.4rem); line-height: .88; letter-spacing: -.02em;
+    color: var(--band); font-variant-numeric: tabular-nums;
+  }
+  .aqi-meta { display: flex; flex-direction: column; gap: 7px; }
+  .aqi-unit {
+    font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+    letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .aqi-band { display: inline-flex; align-items: center; gap: .5ch; }
+  .aqi-dot {
+    flex: none; width: 11px; height: 11px; border-radius: 50%;
+    background: var(--band);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--band) 18%, transparent);
+  }
+  .aqi-band-name {
+    font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 400;
+    font-size: clamp(1.3rem, 5.4vw, 1.7rem); line-height: 1; color: var(--band);
+  }
+  .aqi-caption {
+    font-family: "Newsreader", Georgia, serif; font-style: italic;
+    font-size: 1.05rem; line-height: 1.45; color: var(--ink);
+    max-width: 34ch;
+  }
 
-    const url =
-      "https://air-quality-api.open-meteo.com/v1/air-quality" +
-      `?latitude=${lat}&longitude=${lon}` +
-      "&current=us_aqi,pm2_5,pm10&hourly=us_aqi" +
-      "&timezone=Asia%2FKolkata&forecast_days=1";
+  /* particulate ledger — rows reuse the global .details/.row; just mute the unit */
+  .details .unit { color: var(--ink-soft); }
 
-    const setState = (cls) => { air.className = "air " + cls; };
-    const numOr = (v) => (typeof v === "number" && isFinite(v) ? v.toFixed(1) : "—");
+  /* ---- 24h sketch: thin band-coloured bars; the "now" bar lit + ink-capped ---- */
+  .spark { display: flex; flex-direction: column; gap: 8px; }
+  .spark[hidden] { display: none; }      /* beat .spark's display:flex (UA [hidden] would lose) */
+  .spark-cap {
+    display: flex; justify-content: space-between; gap: 1rem; align-items: baseline;
+    font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .spark-cap-note { letter-spacing: .04em; opacity: .8; }
+  .spark-plot { width: 100%; }
+  .spark-plot svg { display: block; width: 100%; height: 82px; }
+  .spark-axis {
+    display: flex; justify-content: space-between;
+    font-family: "IBM Plex Mono", monospace; font-size: .58rem;
+    letter-spacing: .03em; color: var(--ink-soft); opacity: .85;
+    font-variant-numeric: tabular-nums;
+  }
 
-    // The forecast is hourly and already IST — read the clock off the string, no Date.
-    function fmtTime(iso) {
-      const t = (iso || "").split("T")[1] || "";
-      const H = Number(t.slice(0, 2));
-      const M = Number(t.slice(3, 5));
-      if (!Number.isFinite(H)) return "—";
-      const ap = H < 12 ? "AM" : "PM";
-      const h12 = H % 12 === 0 ? 12 : H % 12;
-      return `${h12}:${String(Number.isFinite(M) ? M : 0).padStart(2, "0")} ${ap} IST`;
+  /* live colour eases between bands; never animates under reduced motion */
+  @media (prefers-reduced-motion: no-preference) {
+    .aqi-value, .aqi-band-name, .aqi-dot {
+      transition: color .45s ease, background-color .45s ease, box-shadow .45s ease;
     }
-    function fmtHour(iso) {
-      const H = Number(((iso || "").split("T")[1] || "").slice(0, 2));
-      if (H === 0) return "12 AM";
-      if (H === 12) return "noon";
-      const ap = H < 12 ? "AM" : "PM";
-      const h12 = H % 12 === 0 ? 12 : H % 12;
-      return `${h12} ${ap}`;
+  }
+  @media (max-width: 380px) { .aqi-block { gap: var(--s-4); } }
+</style>
+
+<script>
+  // --- US EPA AQI bands: semantic colour + honest one-line health caption.
+  // Hues are the recognizable green→maroon ramp, deepened just enough to stay
+  // legible on wet-newsprint paper. The band colour is the ONLY non-almanac ink.
+  const BANDS = [
+    { max: 50,  name: "Good",                           color: "#3f8f4f", caption: "Clean air — fine for everyone, indoors and out." },
+    { max: 100, name: "Moderate",                       color: "#a87d18", caption: "Acceptable — unusually sensitive people may notice it." },
+    { max: 150, name: "Unhealthy for Sensitive Groups", color: "#cf6f22", caption: "Sensitive groups — asthma, kids, the elderly — should ease outdoor effort." },
+    { max: 200, name: "Unhealthy",                      color: "#c0392b", caption: "Everyone may feel it — cut back on long or intense time outdoors." },
+    { max: 300, name: "Very Unhealthy",                 color: "#8a4196", caption: "Health alert — avoid prolonged exertion outdoors." },
+    { max: Infinity, name: "Hazardous",                 color: "#7e2233", caption: "Emergency — stay indoors and keep windows shut." },
+  ];
+  const bandFor = (a) => BANDS.find((b) => a <= b.max) || BANDS[BANDS.length - 1];
+
+  const air = document.getElementById("air");
+  const $ = (id) => document.getElementById(id);
+
+  // Colaba by default; ?lat=&lon= overrides the spot.
+  const params = new URLSearchParams(location.search);
+  const qLat = parseFloat(params.get("lat"));
+  const qLon = parseFloat(params.get("lon"));
+  const hasOverride = Number.isFinite(qLat) && Number.isFinite(qLon);
+  const lat = hasOverride ? qLat : 18.9067;
+  const lon = hasOverride ? qLon : 72.8147;
+  const placeName = hasOverride ? "your spot" : "Colaba";
+
+  const url =
+    "https://air-quality-api.open-meteo.com/v1/air-quality" +
+    `?latitude=${lat}&longitude=${lon}` +
+    "&current=us_aqi,pm2_5,pm10&hourly=us_aqi" +
+    "&timezone=Asia%2FKolkata&forecast_days=1";
+
+  const setState = (cls) => { air.className = "air " + cls; };
+  const numOr = (v) => (typeof v === "number" && isFinite(v) ? v.toFixed(1) : "—");
+
+  // The forecast is hourly and already IST — read the clock off the string, no Date.
+  function fmtTime(iso) {
+    const t = (iso || "").split("T")[1] || "";
+    const H = Number(t.slice(0, 2));
+    const M = Number(t.slice(3, 5));
+    if (!Number.isFinite(H)) return "—";
+    const ap = H < 12 ? "AM" : "PM";
+    const h12 = H % 12 === 0 ? 12 : H % 12;
+    return `${h12}:${String(Number.isFinite(M) ? M : 0).padStart(2, "0")} ${ap} IST`;
+  }
+  function fmtHour(iso) {
+    const H = Number(((iso || "").split("T")[1] || "").slice(0, 2));
+    if (H === 0) return "12 AM";
+    if (H === 12) return "noon";
+    const ap = H < 12 ? "AM" : "PM";
+    const h12 = H % 12 === 0 ? 12 : H % 12;
+    return `${h12} ${ap}`;
+  }
+
+  function fail(headline, detail) {
+    setState("is-error");
+    air.style.setProperty("--band", "var(--ink-soft)");
+    $("aqi-value").textContent = "—";
+    $("band-name").textContent = headline;
+    $("aqi-caption").textContent = detail;
+    $("pm25").textContent = "—";
+    $("pm10").textContent = "—";
+    $("asof").textContent = "—";
+    $("spark").hidden = true;
+  }
+
+  // Build the 24h sketch: one thin bar per hour, coloured by that hour's band; the
+  // current hour's bar is full-opacity and capped with an ink tick. Uses a viewBox
+  // with preserveAspectRatio="none" so the bars stretch edge-to-edge at any width
+  // (zero resize JS). CSS vars resolve via inline style= only, so ink/rule use that.
+  function buildSpark(hourly, curTime) {
+    const spark = $("spark"), plot = $("plot"), axis = $("axis");
+    if (!hourly || !Array.isArray(hourly.time) || !Array.isArray(hourly.us_aqi)) {
+      spark.hidden = true; return;
+    }
+    const times = hourly.time, vals = hourly.us_aqi;
+    const n = Math.min(times.length, vals.length);
+    const present = [];
+    for (let i = 0; i < n; i++) {
+      const v = vals[i];
+      if (typeof v === "number" && isFinite(v)) present.push(v);
+    }
+    if (!present.length) { spark.hidden = true; return; }
+
+    // Current hour → its bar. Match on the YYYY-MM-DDTHH key; else last hour ≤ now.
+    const key = (curTime || "").slice(0, 13);
+    let nowIdx = times.findIndex((t) => t.slice(0, 13) === key);
+    if (nowIdx < 0) for (let i = 0; i < n; i++) if (times[i] <= (curTime || "")) nowIdx = i;
+
+    const VBW = 240, VBH = 72, top = 8, base = 64, plotH = base - top;
+    const scaleMax = Math.max(60, ...present);      // floor so low-AQI days aren't flat
+    const slot = VBW / n, bw = Math.max(2, slot * 0.6);
+
+    let s = `<line x1="0" y1="${base}" x2="${VBW}" y2="${base}" style="stroke:var(--rule)" stroke-width="1"/>`;
+    for (let i = 0; i < n; i++) {
+      const v = vals[i];
+      if (!(typeof v === "number" && isFinite(v))) continue;
+      const h = Math.max(2, (v / scaleMax) * plotH);
+      const x = i * slot + (slot - bw) / 2, y = base - h;
+      const isNow = i === nowIdx;
+      s += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${bw.toFixed(2)}" height="${h.toFixed(2)}" fill="${bandFor(v).color}" opacity="${isNow ? "1" : "0.58"}"/>`;
+      if (isNow) s += `<rect x="${x.toFixed(2)}" y="${(y - 2.6).toFixed(2)}" width="${bw.toFixed(2)}" height="2.3" style="fill:var(--ink)"/>`;
     }
 
-    function fail(headline, detail) {
-      setState("is-error");
+    const lo = Math.round(Math.min(...present)), hi = Math.round(Math.max(...present));
+    const nowVal = (nowIdx >= 0 && typeof vals[nowIdx] === "number") ? Math.round(vals[nowIdx]) : null;
+    const aria = `Today’s hourly US AQI, from ${lo} to ${hi}.` + (nowVal != null ? ` Now ${nowVal}.` : "");
+
+    plot.innerHTML = `<svg viewBox="0 0 ${VBW} ${VBH}" preserveAspectRatio="none" role="img" aria-label="${aria}">${s}</svg>`;
+    axis.innerHTML =
+      `<span>${fmtHour(times[0])}</span>` +
+      `<span>${fmtHour(times[Math.floor(n / 2)])}</span>` +
+      `<span>${fmtHour(times[n - 1])}</span>`;
+    spark.hidden = false;
+  }
+
+  function show(data) {
+    const cur = (data && data.current) || {};
+    $("pm25").textContent = numOr(cur.pm2_5);
+    $("pm10").textContent = numOr(cur.pm10);
+    $("asof").textContent = fmtTime(cur.time);
+
+    const aqi = cur.us_aqi;
+    if (!(typeof aqi === "number" && isFinite(aqi))) {
+      setState("is-empty");
       air.style.setProperty("--band", "var(--ink-soft)");
       $("aqi-value").textContent = "—";
-      $("band-name").textContent = headline;
-      $("aqi-caption").textContent = detail;
-      $("pm25").textContent = "—";
-      $("pm10").textContent = "—";
-      $("asof").textContent = "—";
+      $("band-name").textContent = "No reading yet";
+      $("aqi-caption").textContent = "Open-Meteo has no air-quality reading for this spot right now.";
       $("spark").hidden = true;
+      return;
     }
 
-    // Build the 24h sketch: one thin bar per hour, coloured by that hour's band; the
-    // current hour's bar is full-opacity and capped with an ink tick. Uses a viewBox
-    // with preserveAspectRatio="none" so the bars stretch edge-to-edge at any width
-    // (zero resize JS). CSS vars resolve via inline style= only, so ink/rule use that.
-    function buildSpark(hourly, curTime) {
-      const spark = $("spark"), plot = $("plot"), axis = $("axis");
-      if (!hourly || !Array.isArray(hourly.time) || !Array.isArray(hourly.us_aqi)) {
-        spark.hidden = true; return;
-      }
-      const times = hourly.time, vals = hourly.us_aqi;
-      const n = Math.min(times.length, vals.length);
-      const present = [];
-      for (let i = 0; i < n; i++) {
-        const v = vals[i];
-        if (typeof v === "number" && isFinite(v)) present.push(v);
-      }
-      if (!present.length) { spark.hidden = true; return; }
+    const band = bandFor(aqi);
+    air.style.setProperty("--band", band.color);
+    $("aqi-value").textContent = String(Math.round(aqi));
+    $("band-name").textContent = band.name;
+    $("aqi-caption").textContent = band.caption;
+    setState("is-ready");
+    buildSpark(data.hourly, cur.time);
+  }
 
-      // Current hour → its bar. Match on the YYYY-MM-DDTHH key; else last hour ≤ now.
-      const key = (curTime || "").slice(0, 13);
-      let nowIdx = times.findIndex((t) => t.slice(0, 13) === key);
-      if (nowIdx < 0) for (let i = 0; i < n; i++) if (times[i] <= (curTime || "")) nowIdx = i;
-
-      const VBW = 240, VBH = 72, top = 8, base = 64, plotH = base - top;
-      const scaleMax = Math.max(60, ...present);      // floor so low-AQI days aren't flat
-      const slot = VBW / n, bw = Math.max(2, slot * 0.6);
-
-      let s = `<line x1="0" y1="${base}" x2="${VBW}" y2="${base}" style="stroke:var(--rule)" stroke-width="1"/>`;
-      for (let i = 0; i < n; i++) {
-        const v = vals[i];
-        if (!(typeof v === "number" && isFinite(v))) continue;
-        const h = Math.max(2, (v / scaleMax) * plotH);
-        const x = i * slot + (slot - bw) / 2, y = base - h;
-        const isNow = i === nowIdx;
-        s += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${bw.toFixed(2)}" height="${h.toFixed(2)}" fill="${bandFor(v).color}" opacity="${isNow ? "1" : "0.58"}"/>`;
-        if (isNow) s += `<rect x="${x.toFixed(2)}" y="${(y - 2.6).toFixed(2)}" width="${bw.toFixed(2)}" height="2.3" style="fill:var(--ink)"/>`;
-      }
-
-      const lo = Math.round(Math.min(...present)), hi = Math.round(Math.max(...present));
-      const nowVal = (nowIdx >= 0 && typeof vals[nowIdx] === "number") ? Math.round(vals[nowIdx]) : null;
-      const aria = `Today’s hourly US AQI, from ${lo} to ${hi}.` + (nowVal != null ? ` Now ${nowVal}.` : "");
-
-      plot.innerHTML = `<svg viewBox="0 0 ${VBW} ${VBH}" preserveAspectRatio="none" role="img" aria-label="${aria}">${s}</svg>`;
-      axis.innerHTML =
-        `<span>${fmtHour(times[0])}</span>` +
-        `<span>${fmtHour(times[Math.floor(n / 2)])}</span>` +
-        `<span>${fmtHour(times[n - 1])}</span>`;
-      spark.hidden = false;
+  (async function init() {
+    $("place").textContent = placeName;
+    if (!navigator.onLine) {
+      fail("You’re offline", "Reconnect, then refresh to read the air.");
+      return;
     }
-
-    function show(data) {
-      const cur = (data && data.current) || {};
-      $("pm25").textContent = numOr(cur.pm2_5);
-      $("pm10").textContent = numOr(cur.pm10);
-      $("asof").textContent = fmtTime(cur.time);
-
-      const aqi = cur.us_aqi;
-      if (!(typeof aqi === "number" && isFinite(aqi))) {
-        setState("is-empty");
-        air.style.setProperty("--band", "var(--ink-soft)");
-        $("aqi-value").textContent = "—";
-        $("band-name").textContent = "No reading yet";
-        $("aqi-caption").textContent = "Open-Meteo has no air-quality reading for this spot right now.";
-        $("spark").hidden = true;
-        return;
-      }
-
-      const band = bandFor(aqi);
-      air.style.setProperty("--band", band.color);
-      $("aqi-value").textContent = String(Math.round(aqi));
-      $("band-name").textContent = band.name;
-      $("aqi-caption").textContent = band.caption;
-      setState("is-ready");
-      buildSpark(data.hourly, cur.time);
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error("Open-Meteo " + r.status);
+      show(await r.json());
+    } catch (err) {
+      fail("Air monitor unreachable", "Couldn’t reach Open-Meteo. Refresh to try again.");
+      console.error(err);
     }
-
-    (async function init() {
-      $("place").textContent = placeName;
-      if (!navigator.onLine) {
-        fail("You’re offline", "Reconnect, then refresh to read the air.");
-        return;
-      }
-      try {
-        const r = await fetch(url);
-        if (!r.ok) throw new Error("Open-Meteo " + r.status);
-        show(await r.json());
-      } catch (err) {
-        fail("Air monitor unreachable", "Couldn’t reach Open-Meteo. Refresh to try again.");
-        console.error(err);
-      }
-    })();
-  </script>
-</body>
-</html>
+  })();
+</script>

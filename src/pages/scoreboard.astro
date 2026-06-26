@@ -3,14 +3,18 @@
 // competitor publishes: every forecast we log, graded against what Mumbai's
 // airport (METAR/VABB) actually observed. Zero-JS — every number on this page
 // is computed AT BUILD TIME from data/log.csv, so the daily GitHub Actions
-// build re-bakes the board. Nothing here runs in the browser.
-import "../styles/almanac.css";
+// build re-bakes the board. Nothing here runs in the browser. The <head> +
+// masthead + nav + footer wrapper come from the shared section shell (Page.astro).
+import Page from "../layouts/Page.astro";
 import fs from "node:fs";
+import path from "node:path";
 
 // --- build-time read of the cron's labelled log -------------------------------
-// Resolve relative to THIS module (robust to the build's cwd). The path mirrors
-// pipeline/log_snapshot.py's LOG_PATH = "data/log.csv".
-const LOG_URL = new URL("../../data/log.csv", import.meta.url);
+// Resolve from the project root via process.cwd() — the dir `astro build` runs in
+// (locally and on Vercel, where data/log.csv is committed). NOT import.meta.url,
+// which resolves into dist/ at build time and 404s the file (renders the empty
+// "couldn't read" state). Mirrors pipeline/log_snapshot.py's LOG_PATH = "data/log.csv".
+const LOG_PATH = path.join(process.cwd(), "data", "log.csv");
 
 // Definitions mirrored from the codebase so the board never invents its own:
 //   RAIN_TH  — nowcast.js RAIN_THRESHOLD_MM (0.3): the same "is it raining" line
@@ -23,7 +27,7 @@ type Row = Record<string, string>;
 
 function loadRows(): Row[] | null {
   try {
-    const raw = fs.readFileSync(LOG_URL, "utf8");
+    const raw = fs.readFileSync(LOG_PATH, "utf8");
     const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
     if (lines.length < 2) return []; // header only / empty → no data yet (not an error)
     const header = lines[0].split(",").map((h) => h.trim());
@@ -89,502 +93,425 @@ const builtAt = new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC"
 const title = "पाऊस · Scoreboard — model vs. raw forecast";
 const description =
   "The honesty board: every Mumbai rain forecast we publish, graded against what the airport actually observed. See the raw forecast's hit-and-miss record — and watch the calibrated model have to beat it before it ships.";
-const canonical = new URL("/scoreboard", Astro.site).href;
 ---
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>{title}</title>
-  <meta name="description" content={description} />
-  <link rel="canonical" href={canonical} />
-  <meta name="theme-color" content="#dde2dc" />
-  <meta name="color-scheme" content="light only" />
-  <meta name="darkreader-lock" />
+<Page title={title} description={description} canonicalPath="/scoreboard" active="scoreboard">
+  {/* Hero — the pitch for the page. */}
+  <section class="sb-hero">
+    <p class="sb-eyebrow">The honesty board</p>
+    <h1 class="sb-title">Model vs.<em> raw forecast</em></h1>
+    <p class="sb-lede">
+      Every forecast we publish gets logged, then graded against what Mumbai's
+      airport actually observed — no cherry-picking. Once the calibrated model
+      is live, this page shows it beating the raw forecast on these same hours.
+      If it can't, it doesn't ship.
+    </p>
+  </section>
 
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content={title} />
-  <meta property="og:description" content={description} />
-  <meta property="og:url" content={canonical} />
-  <meta name="twitter:card" content="summary" />
+  {!readOk && (
+    <section class="sb-empty" role="status">
+      <p class="sb-empty-h">Couldn't read the log.</p>
+      <p class="sb-empty-p">The board re-bakes on the next daily build — check back shortly.</p>
+    </section>
+  )}
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,600;9..144,0,900;9..144,1,600&family=Newsreader:ital,opsz@1,18&family=IBM+Plex+Mono:wght@400;500;600&family=Tiro+Devanagari+Marathi&display=swap"
-    rel="stylesheet"
-  />
-</head>
-<body>
-  <main class="sb">
-    {/* Masthead: the Marathi anchor (constant ink) + section nav. */}
-    <header class="sb-head">
-      <span class="anchor" lang="mr">पाऊस</span>
-      <nav class="topnav" aria-label="Sections">
-        <a href="/">Now</a>
-        <a href="/week">Week</a>
-        <a href="/air">Air</a>
-        <a href="/scoreboard" aria-current="page">Scoreboard</a>
-        <a href="/about">About</a>
-      </nav>
-    </header>
-
-    {/* Hero — the pitch for the page. */}
-    <section class="sb-hero">
-      <p class="sb-eyebrow">The honesty board</p>
-      <h1 class="sb-title">Model vs.<em> raw forecast</em></h1>
-      <p class="sb-lede">
-        Every forecast we publish gets logged, then graded against what Mumbai's
-        airport actually observed — no cherry-picking. Once the calibrated model
-        is live, this page shows it beating the raw forecast on these same hours.
-        If it can't, it doesn't ship.
+  {readOk && totalRows === 0 && (
+    <section class="sb-empty" role="status">
+      <p class="sb-empty-h">No snapshots logged yet.</p>
+      <p class="sb-empty-p">
+        The hourly cron hasn't written to <code>data/log.csv</code> yet. This board
+        fills in automatically the moment it does.
       </p>
     </section>
+  )}
 
-    {!readOk && (
-      <section class="sb-empty" role="status">
-        <p class="sb-empty-h">Couldn't read the log.</p>
-        <p class="sb-empty-p">The board re-bakes on the next daily build — check back shortly.</p>
-      </section>
-    )}
-
-    {readOk && totalRows === 0 && (
-      <section class="sb-empty" role="status">
-        <p class="sb-empty-h">No snapshots logged yet.</p>
-        <p class="sb-empty-p">
-          The hourly cron hasn't written to <code>data/log.csv</code> yet. This board
-          fills in automatically the moment it does.
+  {readOk && totalRows > 0 && (
+    <>
+      {/* Progress to live — the gate, stated plainly. */}
+      <section class="sb-card sb-progress" aria-labelledby="sb-progress-h">
+        <div class="sb-progress-top">
+          <p class="sb-klabel" id="sb-progress-h">
+            {live ? "Calibrated model — live" : "Progress to a live model"}
+          </p>
+          <p class="sb-progress-count">
+            <span class="sb-now">{nLab}</span><span class="sb-of"> / {MIN_ROWS}</span>
+            <span class="sb-unit"> labelled</span>
+          </p>
+        </div>
+        <div class="sb-bar" role="img"
+             aria-label={`${nLab} of ${MIN_ROWS} labelled rows`}>
+          <span class="sb-bar-fill" style={`width:${pctToLive}%`}></span>
+        </div>
+        <p class="sb-progress-note">
+          {live
+            ? "Enough graded data to trust a model. The board below now grades the calibrated model against the raw forecast on a holdout it never trained on."
+            : `${remaining} more labelled hours to go. The calibrated logistic model trains every day on GitHub Actions and only goes live at ${MIN_ROWS} graded rows — and only if it beats the raw forecast and the current champion.`}
         </p>
       </section>
-    )}
 
-    {readOk && totalRows > 0 && (
-      <>
-        {/* Progress to live — the gate, stated plainly. */}
-        <section class="sb-card sb-progress" aria-labelledby="sb-progress-h">
-          <div class="sb-progress-top">
-            <p class="sb-klabel" id="sb-progress-h">
-              {live ? "Calibrated model — live" : "Progress to a live model"}
-            </p>
-            <p class="sb-progress-count">
-              <span class="sb-now">{nLab}</span><span class="sb-of"> / {MIN_ROWS}</span>
-              <span class="sb-unit"> labelled</span>
-            </p>
+      {/* Collected so far — the raw volume of evidence. */}
+      <section aria-labelledby="sb-collected-h">
+        <h2 class="sb-h2" id="sb-collected-h">What we've collected</h2>
+        <dl class="sb-stats">
+          <div class="sb-stat">
+            <dt>Snapshots logged</dt>
+            <dd class="sb-n">{totalRows.toLocaleString()}</dd>
+            <p class="sb-stat-sub">across {runs} hourly run{runs === 1 ? "" : "s"}</p>
           </div>
-          <div class="sb-bar" role="img"
-               aria-label={`${nLab} of ${MIN_ROWS} labelled rows`}>
-            <span class="sb-bar-fill" style={`width:${pctToLive}%`}></span>
+          <div class="sb-stat">
+            <dt>Graded rows</dt>
+            <dd class="sb-n">{nLab.toLocaleString()}</dd>
+            <p class="sb-stat-sub">observed by METAR</p>
           </div>
-          <p class="sb-progress-note">
-            {live
-              ? "Enough graded data to trust a model. The board below now grades the calibrated model against the raw forecast on a holdout it never trained on."
-              : `${remaining} more labelled hours to go. The calibrated logistic model trains every day on GitHub Actions and only goes live at ${MIN_ROWS} graded rows — and only if it beats the raw forecast and the current champion.`}
+          <div class="sb-stat">
+            <dt>Observed rain hours</dt>
+            <dd class="sb-n">{rainHours.toLocaleString()}</dd>
+            <p class="sb-stat-sub">of {nLab.toLocaleString()} graded</p>
+          </div>
+          <div class="sb-stat">
+            <dt>Awaiting a grade</dt>
+            <dd class="sb-n">{pending.toLocaleString()}</dd>
+            <p class="sb-stat-sub">future hours, not yet observed</p>
+          </div>
+        </dl>
+      </section>
+
+      {/* The raw forecast's record — the core honesty table. */}
+      <section aria-labelledby="sb-raw-h">
+        <h2 class="sb-h2" id="sb-raw-h">The raw forecast's record</h2>
+        <p class="sb-section-lede">
+          On the {nLab.toLocaleString()} graded hours, counting a <em>rain</em> call
+          whenever the raw forecast read <span class="sb-mono">≥&nbsp;{RAIN_TH}&nbsp;mm·h⁻¹</span>
+          — the same line the Now page draws.
+        </p>
+
+        {nLab === 0 ? (
+          <p class="sb-empty-p sb-inset">
+            No graded hours yet — METAR hasn't labelled any logged hour. Grades
+            appear as past forecast hours get observed.
           </p>
-        </section>
+        ) : (
+          <>
+            <table class="sb-matrix">
+              <caption class="sb-vh">
+                Raw forecast outcomes versus observed rain, on {nLab} graded hours.
+              </caption>
+              <thead>
+                <tr>
+                  <td></td>
+                  <th scope="col">Observed<br /><span class="sb-th-strong">rain</span></th>
+                  <th scope="col">Observed<br /><span class="sb-th-strong">dry</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Forecast rain<span class="sb-th-sub">≥ {RAIN_TH} mm</span></th>
+                  <td class="sb-cell sb-hit">
+                    <span class="sb-cell-n">{TP}</span><span class="sb-cell-l">hits</span>
+                  </td>
+                  <td class="sb-cell sb-fa">
+                    <span class="sb-cell-n">{FP}</span><span class="sb-cell-l">false alarms</span>
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">Forecast dry<span class="sb-th-sub">&lt; {RAIN_TH} mm</span></th>
+                  <td class="sb-cell sb-miss">
+                    <span class="sb-cell-n">{FN}</span><span class="sb-cell-l">misses</span>
+                  </td>
+                  <td class="sb-cell sb-ok">
+                    <span class="sb-cell-n">{TN}</span><span class="sb-cell-l">correct dry</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
-        {/* Collected so far — the raw volume of evidence. */}
-        <section aria-labelledby="sb-collected-h">
-          <h2 class="sb-h2" id="sb-collected-h">What we've collected</h2>
-          <dl class="sb-stats">
-            <div class="sb-stat">
-              <dt>Snapshots logged</dt>
-              <dd class="sb-n">{totalRows.toLocaleString()}</dd>
-              <p class="sb-stat-sub">across {runs} hourly run{runs === 1 ? "" : "s"}</p>
-            </div>
-            <div class="sb-stat">
-              <dt>Graded rows</dt>
-              <dd class="sb-n">{nLab.toLocaleString()}</dd>
-              <p class="sb-stat-sub">observed by METAR</p>
-            </div>
-            <div class="sb-stat">
-              <dt>Observed rain hours</dt>
-              <dd class="sb-n">{rainHours.toLocaleString()}</dd>
-              <p class="sb-stat-sub">of {nLab.toLocaleString()} graded</p>
-            </div>
-            <div class="sb-stat">
-              <dt>Awaiting a grade</dt>
-              <dd class="sb-n">{pending.toLocaleString()}</dd>
-              <p class="sb-stat-sub">future hours, not yet observed</p>
-            </div>
-          </dl>
-        </section>
+            <ul class="sb-metrics">
+              <li>
+                <span class="sb-m-k">Base rate</span>
+                <span class="sb-m-v">{baseRate}</span>
+                <span class="sb-m-d">of graded hours actually had rain</span>
+              </li>
+              <li>
+                <span class="sb-m-k">Detection · POD</span>
+                <span class="sb-m-v">{pod}</span>
+                <span class="sb-m-d">of {observedRain} rain hours, {TP} were forecast</span>
+              </li>
+              <li class="sb-m-flag">
+                <span class="sb-m-k">False-alarm ratio</span>
+                <span class="sb-m-v">{far}</span>
+                <span class="sb-m-d">of {rainCalls} rain calls, {FP} were wrong</span>
+              </li>
+              <li>
+                <span class="sb-m-k">Raw agreement</span>
+                <span class="sb-m-v">{accuracy}</span>
+                <span class="sb-m-d">forecast matched observation</span>
+              </li>
+            </ul>
 
-        {/* The raw forecast's record — the core honesty table. */}
-        <section aria-labelledby="sb-raw-h">
-          <h2 class="sb-h2" id="sb-raw-h">The raw forecast's record</h2>
-          <p class="sb-section-lede">
-            On the {nLab.toLocaleString()} graded hours, counting a <em>rain</em> call
-            whenever the raw forecast read <span class="sb-mono">≥&nbsp;{RAIN_TH}&nbsp;mm·h⁻¹</span>
-            — the same line the Now page draws.
-          </p>
+            {rainCalls > 0 && (
+              <p class="sb-reading">
+                The raw forecast cries wolf: {rainCalls} rain calls, only {TP} right —
+                and it still missed {FN} of {observedRain} real rain hours. Cutting
+                those false alarms is the whole job of the calibrated model.
+              </p>
+            )}
+          </>
+        )}
+      </section>
 
-          {nLab === 0 ? (
-            <p class="sb-empty-p sb-inset">
-              No graded hours yet — METAR hasn't labelled any logged hour. Grades
-              appear as past forecast hours get observed.
-            </p>
-          ) : (
-            <>
-              <table class="sb-matrix">
-                <caption class="sb-vh">
-                  Raw forecast outcomes versus observed rain, on {nLab} graded hours.
-                </caption>
-                <thead>
-                  <tr>
-                    <td></td>
-                    <th scope="col">Observed<br /><span class="sb-th-strong">rain</span></th>
-                    <th scope="col">Observed<br /><span class="sb-th-strong">dry</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <th scope="row">Forecast rain<span class="sb-th-sub">≥ {RAIN_TH} mm</span></th>
-                    <td class="sb-cell sb-hit">
-                      <span class="sb-cell-n">{TP}</span><span class="sb-cell-l">hits</span>
-                    </td>
-                    <td class="sb-cell sb-fa">
-                      <span class="sb-cell-n">{FP}</span><span class="sb-cell-l">false alarms</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Forecast dry<span class="sb-th-sub">&lt; {RAIN_TH} mm</span></th>
-                    <td class="sb-cell sb-miss">
-                      <span class="sb-cell-n">{FN}</span><span class="sb-cell-l">misses</span>
-                    </td>
-                    <td class="sb-cell sb-ok">
-                      <span class="sb-cell-n">{TN}</span><span class="sb-cell-l">correct dry</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+      {/* What "live" will show — the promotion gate, mirrored from train.py. */}
+      <section aria-labelledby="sb-gate-h">
+        <h2 class="sb-h2" id="sb-gate-h">What goes live at {MIN_ROWS}</h2>
+        <p class="sb-section-lede">
+          When the board turns on, it adds the model's column: a
+          <span class="sb-mono"> Brier score</span> measured on a time-ordered
+          holdout the model never trained on. The model only ships when it beats
+          both baselines — and a worse model can never replace a better one.
+        </p>
+        <ol class="sb-gate">
+          <li><span class="sb-gate-n">1</span> Beat the <strong>raw forecast</strong> on the holdout.</li>
+          <li><span class="sb-gate-n">2</span> Beat the current <strong>champion</strong> model.</li>
+          <li><span class="sb-gate-n">3</span> Otherwise — rejected. The champion stays.</li>
+        </ol>
+      </section>
+    </>
+  )}
 
-              <ul class="sb-metrics">
-                <li>
-                  <span class="sb-m-k">Base rate</span>
-                  <span class="sb-m-v">{baseRate}</span>
-                  <span class="sb-m-d">of graded hours actually had rain</span>
-                </li>
-                <li>
-                  <span class="sb-m-k">Detection · POD</span>
-                  <span class="sb-m-v">{pod}</span>
-                  <span class="sb-m-d">of {observedRain} rain hours, {TP} were forecast</span>
-                </li>
-                <li class="sb-m-flag">
-                  <span class="sb-m-k">False-alarm ratio</span>
-                  <span class="sb-m-v">{far}</span>
-                  <span class="sb-m-d">of {rainCalls} rain calls, {FP} were wrong</span>
-                </li>
-                <li>
-                  <span class="sb-m-k">Raw agreement</span>
-                  <span class="sb-m-v">{accuracy}</span>
-                  <span class="sb-m-d">forecast matched observation</span>
-                </li>
-              </ul>
+  <footer slot="footer" class="sb-foot">
+    <p>
+      Forecast: <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a>.
+      Ground truth: NOAA METAR, station VABB (Mumbai airport).
+    </p>
+    <p class="sb-built">Baked at build · {builtAt}</p>
+  </footer>
+</Page>
 
-              {rainCalls > 0 && (
-                <p class="sb-reading">
-                  The raw forecast cries wolf: {rainCalls} rain calls, only {TP} right —
-                  and it still missed {FN} of {observedRain} real rain hours. Cutting
-                  those false alarms is the whole job of the calibrated model.
-                </p>
-              )}
-            </>
-          )}
-        </section>
+<style>
+  /* Scoped to this page. Global tokens (paper/ink/radar) come from almanac.css;
+     the centered column + masthead + section nav come from Page.astro. */
 
-        {/* What "live" will show — the promotion gate, mirrored from train.py. */}
-        <section aria-labelledby="sb-gate-h">
-          <h2 class="sb-h2" id="sb-gate-h">What goes live at {MIN_ROWS}</h2>
-          <p class="sb-section-lede">
-            When the board turns on, it adds the model's column: a
-            <span class="sb-mono"> Brier score</span> measured on a time-ordered
-            holdout the model never trained on. The model only ships when it beats
-            both baselines — and a worse model can never replace a better one.
-          </p>
-          <ol class="sb-gate">
-            <li><span class="sb-gate-n">1</span> Beat the <strong>raw forecast</strong> on the holdout.</li>
-            <li><span class="sb-gate-n">2</span> Beat the current <strong>champion</strong> model.</li>
-            <li><span class="sb-gate-n">3</span> Otherwise — rejected. The champion stays.</li>
-          </ol>
-        </section>
-      </>
-    )}
+  /* ---- hero ---- */
+  .sb-hero { display: flex; flex-direction: column; gap: var(--s-3); }
+  .sb-eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+    letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .sb-title {
+    font-family: "Fraunces", Georgia, serif; font-weight: 900;
+    font-variation-settings: "opsz" 144;
+    font-size: clamp(2.1rem, 8.5vw, 3.4rem); line-height: .98;
+    letter-spacing: -.02em; color: var(--ink); text-wrap: balance;
+  }
+  .sb-title em {
+    font-style: italic; font-weight: 600; color: var(--radar-rain);
+  }
+  .sb-lede {
+    font-family: "Newsreader", Georgia, serif; font-style: italic;
+    font-size: 1.14rem; line-height: 1.5; color: var(--ink);
+    max-width: 38rem;
+  }
 
-    <footer class="sb-foot">
-      <p>
-        Forecast: <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a>.
-        Ground truth: NOAA METAR, station VABB (Mumbai airport).
-      </p>
-      <p class="sb-built">Baked at build · {builtAt}</p>
-    </footer>
-  </main>
+  /* ---- shared section bits ---- */
+  .sb-h2 {
+    font-family: "Fraunces", Georgia, serif; font-weight: 600;
+    font-size: clamp(1.3rem, 5vw, 1.7rem); line-height: 1.05;
+    color: var(--ink); letter-spacing: -.01em; margin-bottom: var(--s-3);
+  }
+  .sb-section-lede {
+    font-family: "Newsreader", Georgia, serif; font-style: italic;
+    font-size: 1.05rem; line-height: 1.5; color: var(--ink-soft);
+    margin-bottom: var(--s-4); max-width: 38rem;
+  }
+  .sb-section-lede em { color: var(--ink); font-style: italic; }
+  .sb-klabel {
+    font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .sb-mono, .sb-th-sub, .sb-of, .sb-unit {
+    font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+  }
 
-  <style>
-    /* Scoped to this page. Global tokens (paper/ink/radar) come from almanac.css. */
+  /* ---- progress to live ---- */
+  .sb-card {
+    background: var(--paper-2); border: 1px solid var(--rule);
+    padding: var(--s-4);
+  }
+  .sb-progress { display: flex; flex-direction: column; gap: var(--s-3); }
+  .sb-progress-top {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--s-4); flex-wrap: wrap;
+  }
+  .sb-progress-count {
+    font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+    color: var(--ink-soft); font-size: .9rem; white-space: nowrap;
+  }
+  .sb-progress-count .sb-now {
+    color: var(--ink); font-weight: 600; font-size: 1.15rem;
+  }
+  .sb-bar {
+    position: relative; height: 10px; width: 100%;
+    background: var(--paper-3); border: 1px solid var(--rule); overflow: hidden;
+  }
+  .sb-bar-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: var(--radar-rain); display: block;
+  }
+  .sb-progress-note {
+    font-family: "IBM Plex Mono", monospace; font-size: .72rem; line-height: 1.55;
+    color: var(--ink-soft); letter-spacing: .01em;
+  }
 
-    .sb {
-      position: relative; z-index: 1;
-      width: min(92vw, 46rem); margin: 0 auto;
-      min-height: 100svh;
-      display: flex; flex-direction: column; gap: var(--s-6);
-      padding:
-        max(var(--s-5), env(safe-area-inset-top))
-        max(var(--s-5), env(safe-area-inset-right))
-        max(var(--s-6), env(safe-area-inset-bottom))
-        max(var(--s-5), env(safe-area-inset-left));
-    }
+  /* ---- collected stats grid ---- */
+  .sb-stats {
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    border-top: 1px solid var(--rule); border-left: 1px solid var(--rule);
+  }
+  .sb-stat {
+    border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    padding: var(--s-4) var(--s-3);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .sb-stat dt {
+    font-family: "IBM Plex Mono", monospace; font-size: .6rem;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .sb-n {
+    font-family: "IBM Plex Mono", monospace; font-weight: 600;
+    font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1;
+    color: var(--ink); font-variant-numeric: tabular-nums;
+  }
+  .sb-stat-sub {
+    font-family: "Newsreader", Georgia, serif; font-style: italic;
+    font-size: .9rem; color: var(--ink-soft);
+  }
 
-    /* ---- masthead: wordmark + section nav ---- */
-    .sb-head {
-      display: flex; align-items: baseline; justify-content: space-between;
-      gap: var(--s-4); flex-wrap: wrap;
-      border-bottom: 2px solid var(--ink); padding-bottom: var(--s-3);
-    }
-    .topnav {
-      display: flex; flex-wrap: wrap; align-items: baseline; gap: 1rem;
-      font-family: "IBM Plex Mono", monospace; font-size: .7rem;
-      letter-spacing: .12em; text-transform: uppercase;
-    }
-    .topnav a {
-      color: var(--ink-soft); text-decoration: none;
-      padding-bottom: 2px; transition: color .2s ease;
-    }
-    .topnav a:hover, .topnav a:focus-visible { color: var(--ink); }
-    .topnav a[aria-current="page"] {
-      color: var(--ink);
-      border-bottom: 1px solid var(--ink);
-    }
+  /* ---- confusion matrix ---- */
+  .sb-matrix {
+    width: 100%; border-collapse: collapse;
+    margin-bottom: var(--s-4);
+  }
+  .sb-matrix th, .sb-matrix td {
+    border: 1px solid var(--rule); padding: var(--s-3) var(--s-3);
+    vertical-align: top; text-align: left;
+  }
+  .sb-matrix thead td { border: 0; }
+  .sb-matrix thead th {
+    font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft);
+    font-weight: 400; background: var(--paper-2); line-height: 1.3;
+  }
+  .sb-th-strong { color: var(--ink); font-weight: 600; }
+  .sb-matrix tbody th {
+    font-family: "IBM Plex Mono", monospace; font-size: .68rem;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft);
+    font-weight: 400; background: var(--paper-2); white-space: nowrap;
+  }
+  .sb-th-sub {
+    display: block; margin-top: 2px;
+    font-size: .58rem; letter-spacing: .04em; opacity: .8; text-transform: none;
+  }
+  .sb-cell-n {
+    display: block;
+    font-family: "IBM Plex Mono", monospace; font-weight: 600;
+    font-size: clamp(1.5rem, 6vw, 2rem); line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--ink);
+  }
+  .sb-cell-l {
+    display: block; margin-top: 3px;
+    font-family: "IBM Plex Mono", monospace; font-size: .58rem;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  /* radar data-ink: only the costly cells get lit — the false-alarm story */
+  .sb-fa   .sb-cell-n { color: var(--radar-flood); }
+  .sb-fa   .sb-cell-l { color: var(--radar-flood); }
+  .sb-miss .sb-cell-n { color: var(--radar-now); }
+  .sb-hit  .sb-cell-n { color: var(--radar-dry); }
 
-    /* ---- hero ---- */
-    .sb-hero { display: flex; flex-direction: column; gap: var(--s-3); }
-    .sb-eyebrow {
-      font-family: "IBM Plex Mono", monospace; font-size: .62rem;
-      letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft);
-    }
-    .sb-title {
-      font-family: "Fraunces", Georgia, serif; font-weight: 900;
-      font-variation-settings: "opsz" 144;
-      font-size: clamp(2.1rem, 8.5vw, 3.4rem); line-height: .98;
-      letter-spacing: -.02em; color: var(--ink); text-wrap: balance;
-    }
-    .sb-title em {
-      font-style: italic; font-weight: 600; color: var(--radar-rain);
-    }
-    .sb-lede {
-      font-family: "Newsreader", Georgia, serif; font-style: italic;
-      font-size: 1.14rem; line-height: 1.5; color: var(--ink);
-      max-width: 38rem;
-    }
+  /* ---- derived metrics ---- */
+  .sb-metrics { list-style: none; display: flex; flex-direction: column; }
+  .sb-metrics li {
+    display: grid; grid-template-columns: 1fr auto; align-items: baseline;
+    gap: 4px var(--s-4); padding: var(--s-3) 0;
+    border-top: 1px solid var(--rule);
+  }
+  .sb-metrics li:last-child { border-bottom: 1px solid var(--rule); }
+  .sb-m-k {
+    font-family: "IBM Plex Mono", monospace; font-size: .68rem;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .sb-m-v {
+    grid-row: span 2; align-self: center;
+    font-family: "IBM Plex Mono", monospace; font-weight: 600;
+    font-size: 1.5rem; color: var(--ink); font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .sb-m-d {
+    grid-column: 1; font-family: "Newsreader", Georgia, serif; font-style: italic;
+    font-size: .92rem; color: var(--ink-soft);
+  }
+  .sb-m-flag .sb-m-v { color: var(--radar-flood); }
 
-    /* ---- shared section bits ---- */
-    .sb-h2 {
-      font-family: "Fraunces", Georgia, serif; font-weight: 600;
-      font-size: clamp(1.3rem, 5vw, 1.7rem); line-height: 1.05;
-      color: var(--ink); letter-spacing: -.01em; margin-bottom: var(--s-3);
-    }
-    .sb-section-lede {
-      font-family: "Newsreader", Georgia, serif; font-style: italic;
-      font-size: 1.05rem; line-height: 1.5; color: var(--ink-soft);
-      margin-bottom: var(--s-4); max-width: 38rem;
-    }
-    .sb-section-lede em { color: var(--ink); font-style: italic; }
-    .sb-klabel {
-      font-family: "IBM Plex Mono", monospace; font-size: .62rem;
-      letter-spacing: .16em; text-transform: uppercase; color: var(--ink-soft);
-    }
-    .sb-mono, .sb-th-sub, .sb-of, .sb-unit {
-      font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
-    }
+  .sb-reading {
+    font-family: "Newsreader", Georgia, serif; font-style: italic;
+    font-size: 1.1rem; line-height: 1.55; color: var(--ink);
+    border-left: 3px solid var(--radar-flood); padding: 4px 0 4px var(--s-4);
+    margin-top: var(--s-4); max-width: 38rem;
+  }
 
-    /* ---- progress to live ---- */
-    .sb-card {
-      background: var(--paper-2); border: 1px solid var(--rule);
-      padding: var(--s-4);
-    }
-    .sb-progress { display: flex; flex-direction: column; gap: var(--s-3); }
-    .sb-progress-top {
-      display: flex; align-items: baseline; justify-content: space-between;
-      gap: var(--s-4); flex-wrap: wrap;
-    }
-    .sb-progress-count {
-      font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
-      color: var(--ink-soft); font-size: .9rem; white-space: nowrap;
-    }
-    .sb-progress-count .sb-now {
-      color: var(--ink); font-weight: 600; font-size: 1.15rem;
-    }
-    .sb-bar {
-      position: relative; height: 10px; width: 100%;
-      background: var(--paper-3); border: 1px solid var(--rule); overflow: hidden;
-    }
-    .sb-bar-fill {
-      position: absolute; left: 0; top: 0; bottom: 0;
-      background: var(--radar-rain); display: block;
-    }
-    .sb-progress-note {
-      font-family: "IBM Plex Mono", monospace; font-size: .72rem; line-height: 1.55;
-      color: var(--ink-soft); letter-spacing: .01em;
-    }
+  /* ---- promotion gate ---- */
+  .sb-gate { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+  .sb-gate li {
+    display: flex; align-items: baseline; gap: var(--s-3);
+    padding: var(--s-3) 0; border-top: 1px solid var(--rule);
+    font-family: "Newsreader", Georgia, serif; font-size: 1.05rem; color: var(--ink);
+  }
+  .sb-gate li:last-child { border-bottom: 1px solid var(--rule); color: var(--ink-soft); }
+  .sb-gate-n {
+    flex: none; font-family: "IBM Plex Mono", monospace; font-weight: 600;
+    font-size: .8rem; color: var(--radar-rain); font-variant-numeric: tabular-nums;
+  }
+  .sb-gate strong { font-weight: 600; }
 
-    /* ---- collected stats grid ---- */
-    .sb-stats {
-      display: grid; grid-template-columns: repeat(2, 1fr);
-      border-top: 1px solid var(--rule); border-left: 1px solid var(--rule);
-    }
-    .sb-stat {
-      border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
-      padding: var(--s-4) var(--s-3);
-      display: flex; flex-direction: column; gap: 4px;
-    }
-    .sb-stat dt {
-      font-family: "IBM Plex Mono", monospace; font-size: .6rem;
-      letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft);
-    }
-    .sb-n {
-      font-family: "IBM Plex Mono", monospace; font-weight: 600;
-      font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1;
-      color: var(--ink); font-variant-numeric: tabular-nums;
-    }
-    .sb-stat-sub {
-      font-family: "Newsreader", Georgia, serif; font-style: italic;
-      font-size: .9rem; color: var(--ink-soft);
-    }
+  /* ---- empty / error states ---- */
+  .sb-empty {
+    background: var(--paper-2); border: 1px solid var(--rule);
+    border-left: 3px solid var(--ink-soft); padding: var(--s-4);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .sb-empty-h {
+    font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 1.2rem;
+    color: var(--ink);
+  }
+  .sb-empty-p, .sb-inset {
+    font-family: "Newsreader", Georgia, serif; font-style: italic;
+    font-size: 1rem; color: var(--ink-soft);
+  }
+  .sb-inset {
+    border-left: 3px solid var(--rule); padding-left: var(--s-4);
+  }
+  .sb-empty-p code, .sb-empty-p strong {
+    font-family: "IBM Plex Mono", monospace; font-style: normal;
+    font-size: .85em; color: var(--ink);
+  }
 
-    /* ---- confusion matrix ---- */
-    .sb-matrix {
-      width: 100%; border-collapse: collapse;
-      margin-bottom: var(--s-4);
-    }
-    .sb-matrix th, .sb-matrix td {
-      border: 1px solid var(--rule); padding: var(--s-3) var(--s-3);
-      vertical-align: top; text-align: left;
-    }
-    .sb-matrix thead td { border: 0; }
-    .sb-matrix thead th {
-      font-family: "IBM Plex Mono", monospace; font-size: .62rem;
-      letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft);
-      font-weight: 400; background: var(--paper-2); line-height: 1.3;
-    }
-    .sb-th-strong { color: var(--ink); font-weight: 600; }
-    .sb-matrix tbody th {
-      font-family: "IBM Plex Mono", monospace; font-size: .68rem;
-      letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft);
-      font-weight: 400; background: var(--paper-2); white-space: nowrap;
-    }
-    .sb-th-sub {
-      display: block; margin-top: 2px;
-      font-size: .58rem; letter-spacing: .04em; opacity: .8; text-transform: none;
-    }
-    .sb-cell-n {
-      display: block;
-      font-family: "IBM Plex Mono", monospace; font-weight: 600;
-      font-size: clamp(1.5rem, 6vw, 2rem); line-height: 1;
-      font-variant-numeric: tabular-nums; color: var(--ink);
-    }
-    .sb-cell-l {
-      display: block; margin-top: 3px;
-      font-family: "IBM Plex Mono", monospace; font-size: .58rem;
-      letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft);
-    }
-    /* radar data-ink: only the costly cells get lit — the false-alarm story */
-    .sb-fa   .sb-cell-n { color: var(--radar-flood); }
-    .sb-fa   .sb-cell-l { color: var(--radar-flood); }
-    .sb-miss .sb-cell-n { color: var(--radar-now); }
-    .sb-hit  .sb-cell-n { color: var(--radar-dry); }
+  /* ---- footer ---- */
+  .sb-foot {
+    margin-top: auto; padding-top: var(--s-4);
+    border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", monospace; font-size: .68rem; line-height: 1.6;
+    color: var(--ink-soft); letter-spacing: .02em;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .sb-foot a { color: var(--radar-rain); text-underline-offset: 2px; }
+  .sb-foot a:hover, .sb-foot a:focus-visible { color: var(--ink); }
+  .sb-built { font-variant-numeric: tabular-nums; opacity: .85; }
 
-    /* ---- derived metrics ---- */
-    .sb-metrics { list-style: none; display: flex; flex-direction: column; }
-    .sb-metrics li {
-      display: grid; grid-template-columns: 1fr auto; align-items: baseline;
-      gap: 4px var(--s-4); padding: var(--s-3) 0;
-      border-top: 1px solid var(--rule);
-    }
-    .sb-metrics li:last-child { border-bottom: 1px solid var(--rule); }
-    .sb-m-k {
-      font-family: "IBM Plex Mono", monospace; font-size: .68rem;
-      letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft);
-    }
-    .sb-m-v {
-      grid-row: span 2; align-self: center;
-      font-family: "IBM Plex Mono", monospace; font-weight: 600;
-      font-size: 1.5rem; color: var(--ink); font-variant-numeric: tabular-nums;
-      text-align: right;
-    }
-    .sb-m-d {
-      grid-column: 1; font-family: "Newsreader", Georgia, serif; font-style: italic;
-      font-size: .92rem; color: var(--ink-soft);
-    }
-    .sb-m-flag .sb-m-v { color: var(--radar-flood); }
+  .sb-vh {
+    position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
 
-    .sb-reading {
-      font-family: "Newsreader", Georgia, serif; font-style: italic;
-      font-size: 1.1rem; line-height: 1.55; color: var(--ink);
-      border-left: 3px solid var(--radar-flood); padding: 4px 0 4px var(--s-4);
-      margin-top: var(--s-4); max-width: 38rem;
-    }
-
-    /* ---- promotion gate ---- */
-    .sb-gate { list-style: none; display: flex; flex-direction: column; gap: 2px; }
-    .sb-gate li {
-      display: flex; align-items: baseline; gap: var(--s-3);
-      padding: var(--s-3) 0; border-top: 1px solid var(--rule);
-      font-family: "Newsreader", Georgia, serif; font-size: 1.05rem; color: var(--ink);
-    }
-    .sb-gate li:last-child { border-bottom: 1px solid var(--rule); color: var(--ink-soft); }
-    .sb-gate-n {
-      flex: none; font-family: "IBM Plex Mono", monospace; font-weight: 600;
-      font-size: .8rem; color: var(--radar-rain); font-variant-numeric: tabular-nums;
-    }
-    .sb-gate strong { font-weight: 600; }
-
-    /* ---- empty / error states ---- */
-    .sb-empty {
-      background: var(--paper-2); border: 1px solid var(--rule);
-      border-left: 3px solid var(--ink-soft); padding: var(--s-4);
-      display: flex; flex-direction: column; gap: 6px;
-    }
-    .sb-empty-h {
-      font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 1.2rem;
-      color: var(--ink);
-    }
-    .sb-empty-p, .sb-inset {
-      font-family: "Newsreader", Georgia, serif; font-style: italic;
-      font-size: 1rem; color: var(--ink-soft);
-    }
-    .sb-inset {
-      border-left: 3px solid var(--rule); padding-left: var(--s-4);
-    }
-    .sb-empty-p code, .sb-empty-p strong {
-      font-family: "IBM Plex Mono", monospace; font-style: normal;
-      font-size: .85em; color: var(--ink);
-    }
-
-    /* ---- footer ---- */
-    .sb-foot {
-      margin-top: auto; padding-top: var(--s-4);
-      border-top: 1px solid var(--rule);
-      font-family: "IBM Plex Mono", monospace; font-size: .68rem; line-height: 1.6;
-      color: var(--ink-soft); letter-spacing: .02em;
-      display: flex; flex-direction: column; gap: 3px;
-    }
-    .sb-foot a { color: var(--radar-rain); text-underline-offset: 2px; }
-    .sb-foot a:hover, .sb-foot a:focus-visible { color: var(--ink); }
-    .sb-built { font-variant-numeric: tabular-nums; opacity: .85; }
-
-    .sb-vh {
-      position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
-      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-    }
-
-    /* wider screens: stats go 4-across, type breathes a touch more */
-    @media (min-width: 620px) {
-      .sb-stats { grid-template-columns: repeat(4, 1fr); }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .topnav a { transition: none; }
-    }
-  </style>
-</body>
-</html>
+  /* wider screens: stats go 4-across, type breathes a touch more */
+  @media (min-width: 620px) {
+    .sb-stats { grid-template-columns: repeat(4, 1fr); }
+  }
+</style>
