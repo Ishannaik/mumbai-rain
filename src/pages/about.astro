@@ -1,0 +1,421 @@
+---
+// about.astro — the honest HOW-IT-WORKS page. A standalone Almanac document
+// (no live island, no locality picker): just the method, in plain words.
+// Reuses the global tokens + the EXACT <head> font/anti-dark-mode setup from
+// Almanac.astro; page-specific styling lives in the scoped <style> below.
+import "../styles/almanac.css";
+
+const title = "How पाऊस works — the honest method";
+const description =
+  "How the Mumbai rain app works: a $0 static site, keyless Open-Meteo forecasts, independent METAR rain labels from VABB, and a calibrated logistic model that self-improves behind an eval gate. What it claims — and what it doesn't.";
+const canonical = new URL("/about", Astro.site).href;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <link rel="canonical" href={canonical} />
+  <meta name="theme-color" content="#dde2dc" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="darkreader-lock" />
+
+  <!-- Open Graph / social -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:url" content={canonical} />
+  <meta name="twitter:card" content="summary" />
+
+  <!-- The Monsoon Almanac's four faces, one combined request:
+       Fraunces (display verdict, incl. 600 for italic emphasis), Newsreader
+       italic (reading voice), IBM Plex Mono incl. 600 (instruments/data),
+       Tiro Devanagari Marathi (पाऊस anchor). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,600;9..144,0,900;9..144,1,600&family=Newsreader:ital,opsz@1,18&family=IBM+Plex+Mono:wght@400;500;600&family=Tiro+Devanagari+Marathi&display=swap"
+    rel="stylesheet"
+  />
+</head>
+<body>
+  <main class="doc">
+    <!-- Masthead: the Marathi anchor (constant ink identity) + section nav. -->
+    <header class="masthead">
+      <span class="anchor" lang="mr">पाऊस</span>
+      <nav class="topnav" aria-label="Sections">
+        <a href="/">Now</a>
+        <a href="/week">Week</a>
+        <a href="/air">Air</a>
+        <a href="/scoreboard">Scoreboard</a>
+        <a href="/about" aria-current="page">About</a>
+      </nav>
+    </header>
+
+    <!-- Lede -->
+    <section class="intro">
+      <p class="kicker">Colophon · how it works</p>
+      <h1 class="title">An honest machine for <em>one question</em></h1>
+      <p class="lede">
+        पाऊस answers a single question — will it rain at your spot in the next
+        couple of hours — and tries to answer it well, cheaply, and without
+        pretending to be more than it is. Here is the whole machine: the
+        architecture, the data, the model, and the line between what it can
+        claim and what it can't.
+      </p>
+    </section>
+
+    <!-- 01 · architecture -->
+    <section class="method">
+      <p class="method-kicker"><span class="n">01</span> The architecture</p>
+      <h2>Free, even at <em>zero users</em></h2>
+      <p>
+        There is no server. The page you're reading is plain HTML and CSS; one
+        small script runs in <em>your</em> browser, calls the weather API
+        directly, and applies a handful of numbers. Nothing runs on a backend
+        per visit — no database answering queries, no API key, no credit card.
+      </p>
+      <p>
+        Because the work happens in the browser and the data feed is free, the
+        running cost is the same at zero users as at a million: nothing. The
+        site is served as static files from a CDN; the forecast comes keyless
+        from <a href="https://open-meteo.com/">Open-Meteo</a>. That's the entire
+        bill.
+      </p>
+      <dl class="spec">
+        <div><dt>server</dt><dd>none · static CDN</dd></div>
+        <div><dt>API key</dt><dd>none required</dd></div>
+        <div><dt>compute</dt><dd>your browser</dd></div>
+        <div><dt>cost</dt><dd>$0 at any scale</dd></div>
+        <div><dt>forecast fetch</dt><dd>keyless Open-Meteo</dd></div>
+      </dl>
+    </section>
+
+    <!-- 02 · data -->
+    <section class="method">
+      <p class="method-kicker"><span class="n">02</span> The data</p>
+      <h2>Two streams, kept <em>deliberately apart</em></h2>
+      <p>
+        The <b>input</b> is forecast. From Open-Meteo we read two models:
+        <code>best_match</code> — its tuned multi-model blend, our primary feed —
+        and <code>ecmwf_ifs025</code>, ECMWF's flagship operational physics
+        model, Europe's gold standard, kept as the benchmark we measure
+        ourselves against. Alongside them rides the single strongest 0–2 hour
+        clue: how much rain actually fell in the last three hours.
+      </p>
+      <p>
+        The <b>answer key</b> is not forecast. It's <code>METAR</code> — the real
+        sky reports filed at Mumbai airport (<code>VABB</code>, Chhatrapati
+        Shivaji) by trained observers and instruments, free and keyless. We read
+        the present-weather code — <code>RA</code> and <code>DZ</code> mean rain;
+        mist, haze and fog don't — into a plain yes-or-no: did it rain this hour?
+      </p>
+      <p class="muted">
+        This separation is the whole point. We never grade a forecast against
+        another forecast — that would make "we're accurate" a tautology. The
+        label is an independent ground observation, so the correction we learn
+        from it is honest rather than circular.
+      </p>
+      <dl class="spec">
+        <div><dt>forecast</dt><dd>Open-Meteo best_match</dd></div>
+        <div><dt>benchmark</dt><dd>ECMWF-IFS · ecmwf_ifs025</dd></div>
+        <div><dt>top feature</dt><dd>rain, last 3&nbsp;h</dd></div>
+        <div><dt>ground truth</dt><dd>METAR · VABB airport</dd></div>
+        <div><dt>rain tokens</dt><dd>RA · DZ</dd></div>
+        <div><dt>forecast vs label</dt><dd>independent</dd></div>
+      </dl>
+    </section>
+
+    <!-- 03 · model -->
+    <section class="method">
+      <p class="method-kicker"><span class="n">03</span> The model</p>
+      <h2>A few numbers, applied in <em>your browser</em></h2>
+      <p>
+        The model is a calibrated logistic classifier. Five inputs — the two
+        forecasts, the hour of day (as sine and cosine), and the recent rain —
+        go in; one corrected probability of rain comes out. That's all of it.
+      </p>
+      <p>
+        It's trained offline and exported to <code>model.json</code>: a few
+        kilobytes of weights and an intercept. The browser applies them with one
+        line of arithmetic — <code>sigmoid(w·x + b)</code>. No machine-learning
+        engine runs on the live path, no GPU, no inference server. The "AI" is
+        already reduced to multiplication and addition before it ever reaches you.
+      </p>
+      <p>
+        And it sharpens itself, for free. An hourly job on GitHub Actions logs
+        each forecast next to what METAR later observed — a growing diary
+        (<code>log.csv</code>, versioned in Git). A daily job retrains on that
+        diary. A fresh model only replaces the live one if it beats both the
+        current champion <em>and</em> the raw forecast on a time-ordered holdout —
+        a walk-forward test with no peeking at the future. So the served model
+        can only improve or hold; it can't quietly regress.
+      </p>
+      <dl class="spec">
+        <div><dt>model</dt><dd>logistic · 5 features</dd></div>
+        <div><dt>served as</dt><dd>sigmoid(w·x + b)</dd></div>
+        <div><dt>file</dt><dd>model.json · few&nbsp;KB</dd></div>
+        <div><dt>logging</dt><dd>hourly · Actions cron</dd></div>
+        <div><dt>retrain</dt><dd>daily · eval-gated</dd></div>
+        <div><dt>promotion</dt><dd>beats champion + raw</dd></div>
+      </dl>
+    </section>
+
+    <!-- 04 · claims -->
+    <section class="method">
+      <p class="method-kicker"><span class="n">04</span> The claims</p>
+      <h2>What it does — and <em>doesn't</em> — claim</h2>
+      <p>
+        Honesty here means stating the bar, not boasting a number. The eval gate
+        refuses to ship a model that doesn't clear the obvious baselines on a
+        fair, time-ordered holdout — and is equally clear about the league it
+        isn't playing in.
+      </p>
+      <div class="claims">
+        <div class="claim is-does">
+          <h3>What it's built to beat</h3>
+          <ul>
+            <li><b>Persistence</b> — "same as the last hour."</li>
+            <li><b>Climatology</b> — the seasonal base rate.</li>
+            <li>The <b>raw forecast</b>, including raw ECMWF-IFS, on its own rain call.</li>
+            <li>On the measures that matter for a yes/no call: <b>calibration</b> (Brier score) and <b>false-alarm rate</b> — the forecast's wrong rain warnings.</li>
+          </ul>
+        </div>
+        <div class="claim is-doesnt">
+          <h3>What it doesn't claim</h3>
+          <ul>
+            <li>To out-predict <b>frontier AI</b> weather models (GraphCast, AIFS and the like) at their own game.</li>
+            <li>To use <b>live radar</b> — there's none on the free path. This is a calibrated correction of a public forecast for one city.</li>
+            <li>Any number you can't check: the live model's real scorecard is computed on logged outcomes, not asserted here.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- live model colophon — progressive enhancement; meaningful without JS -->
+    <section class="colophon" aria-labelledby="colophon-h">
+      <p class="method-kicker" id="colophon-h"><span class="n">·</span> The model serving you right now</p>
+      <p>
+        Everything above is carried by one small file, <code>model.json</code>.
+        Its version and last-retrain date are stamped inside it; the full
+        scorecard — Brier score against the raw forecast and against climatology,
+        on real logged outcomes — lives on the <a href="/scoreboard">Scoreboard</a>.
+      </p>
+      <dl class="spec">
+        <div><dt>version</dt><dd id="m-version">—</dd></div>
+        <div><dt>last retrained</dt><dd id="m-trained">—</dd></div>
+      </dl>
+    </section>
+
+    <footer class="foot">
+      <p class="colo">
+        Open by design — every step above is a small, inspectable piece. The
+        repository is private for now, so there's no public link yet.
+      </p>
+      <p class="attrib">
+        Forecasts: <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a>.
+        Rain truth: METAR via NOAA Aviation Weather (VABB).
+      </p>
+    </footer>
+  </main>
+
+  <!-- Tiny, standalone enhancement: stamp the live model's version + retrain
+       date from /model.json. No island dependency, no motion. If the fetch
+       fails the static "—" / Scoreboard fallback simply stays. -->
+  <script>
+    const elV = document.getElementById("m-version");
+    const elT = document.getElementById("m-trained");
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+    function fmtDate(iso) {
+      const p = String(iso).slice(0, 10).split("-");
+      if (p.length !== 3) return String(iso).slice(0, 10);
+      const mi = Number(p[1]) - 1;
+      const mon = MONTHS[mi] || p[1];
+      return `${Number(p[2])} ${mon} ${p[0]}`;
+    }
+
+    (async () => {
+      try {
+        const r = await fetch("/model.json", { cache: "no-store" });
+        if (!r.ok) throw new Error(`model.json ${r.status}`);
+        const m = await r.json();
+        if (elV) elV.textContent = m.version != null ? `v${m.version}` : (m.type || "live");
+        if (elT && m.trained_at) elT.textContent = fmtDate(m.trained_at);
+      } catch (err) {
+        // Calm fallback — keep the page whole, point to the live scorecard.
+        if (elV) elV.textContent = "see Scoreboard";
+        console.error("about: couldn't read model.json", err);
+      }
+    })();
+  </script>
+
+  <style>
+    /* ---- reading-document shell (wider than the home "rain ticket") ---- */
+    .doc {
+      position: relative; z-index: 1;
+      width: min(92vw, 44rem); margin: 0 auto;
+      min-height: 100svh;
+      display: flex; flex-direction: column; gap: var(--s-6);
+      padding:
+        max(var(--s-5), env(safe-area-inset-top))
+        max(var(--s-5), env(safe-area-inset-right))
+        max(var(--s-6), env(safe-area-inset-bottom))
+        max(var(--s-5), env(safe-area-inset-left));
+    }
+
+    /* ---- section nav (understated mono, current = full ink + underline) ---- */
+    .topnav {
+      display: flex; flex-wrap: wrap; gap: 1rem;
+      font-family: "IBM Plex Mono", monospace; font-size: .7rem;
+      letter-spacing: .14em; text-transform: uppercase;
+    }
+    .topnav a {
+      color: var(--ink-soft); text-decoration: none;
+      transition: color .2s ease;
+    }
+    .topnav a:hover { color: var(--ink); }
+    .topnav a[aria-current="page"] {
+      color: var(--ink);
+      text-decoration: underline; text-decoration-thickness: 1px;
+      text-underline-offset: 4px;
+    }
+    .topnav a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+    /* ---- lede ---- */
+    .intro { display: flex; flex-direction: column; gap: var(--s-4); }
+    .kicker {
+      font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+      letter-spacing: .18em; text-transform: uppercase; color: var(--ink-soft);
+    }
+    .title {
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 900; font-variation-settings: "opsz" 144;
+      font-size: clamp(2.1rem, 8.5vw, 3.5rem);
+      line-height: .98; letter-spacing: -.02em; text-wrap: balance;
+      color: var(--ink);
+    }
+    .title em { font-style: italic; font-weight: 600; }
+    .lede {
+      font-family: "Newsreader", Georgia, serif; font-style: italic;
+      font-size: clamp(1.12rem, 4.6vw, 1.4rem); line-height: 1.45;
+      color: var(--ink); max-width: 36rem;
+    }
+
+    /* ---- method sections ---- */
+    .method { display: flex; flex-direction: column; gap: var(--s-4); }
+    .method-kicker {
+      display: flex; align-items: center; gap: .6em;
+      font-family: "IBM Plex Mono", monospace; font-size: .62rem;
+      letter-spacing: .18em; text-transform: uppercase; color: var(--ink-soft);
+    }
+    .method-kicker .n { color: var(--radar-rain); font-weight: 600; }
+    .method h2 {
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 900; font-variation-settings: "opsz" 72;
+      font-size: clamp(1.55rem, 6vw, 2.25rem);
+      line-height: 1.03; letter-spacing: -.015em; text-wrap: balance;
+      color: var(--ink);
+    }
+    .method h2 em { font-style: italic; font-weight: 600; }
+    .method p {
+      font-family: "Newsreader", Georgia, serif;
+      font-size: clamp(1.02rem, 4vw, 1.12rem); line-height: 1.6;
+      color: var(--ink); max-width: 38rem;
+    }
+    .method p.muted { color: var(--ink-soft); }
+    .method p b { font-weight: 600; }
+
+    /* inline technical bits */
+    code {
+      font-family: "IBM Plex Mono", monospace; font-size: .82em;
+      background: var(--paper-2); border: 1px solid var(--rule-soft);
+      border-radius: 4px; padding: 1px 5px; color: var(--ink);
+      white-space: nowrap;
+    }
+    a {
+      color: var(--radar-rain);
+      text-decoration-thickness: 1px; text-underline-offset: 2px;
+    }
+    a:hover, a:focus-visible { color: var(--ink); }
+
+    /* ---- mono spec ledger (echoes the home detail rows) ---- */
+    .spec { display: flex; flex-direction: column; margin-top: 2px; }
+    .spec > div {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--s-4); padding: 10px 0; border-top: 1px solid var(--rule);
+    }
+    .spec dt {
+      font-family: "IBM Plex Mono", monospace; font-size: .64rem;
+      letter-spacing: .13em; text-transform: uppercase; color: var(--ink-soft);
+    }
+    .spec dd {
+      font-family: "IBM Plex Mono", monospace; font-size: .82rem;
+      color: var(--ink); text-align: right; font-variant-numeric: tabular-nums;
+    }
+
+    /* ---- claims: does / doesn't ---- */
+    .claims { display: flex; flex-direction: column; gap: var(--s-4); }
+    .claim {
+      padding: var(--s-3) var(--s-4);
+      background: var(--paper-2); border-left: 3px solid var(--rule);
+    }
+    .claim.is-does   { border-left-color: var(--radar-dry); }
+    .claim.is-doesnt { border-left-color: var(--ink-soft); }
+    .claim h3 {
+      font-family: "IBM Plex Mono", monospace; font-size: .64rem;
+      letter-spacing: .16em; text-transform: uppercase;
+      color: var(--ink-soft); margin-bottom: 10px;
+    }
+    .claim.is-does h3 { color: var(--radar-dry); }
+    .claim ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+    .claim li {
+      position: relative; padding-left: 1.3em;
+      font-family: "Newsreader", Georgia, serif;
+      font-size: 1.05rem; line-height: 1.45; color: var(--ink);
+    }
+    .claim li b { font-weight: 600; }
+    .claim li::before {
+      position: absolute; left: 0; top: 0;
+      font-family: "IBM Plex Mono", monospace; font-size: .8em; line-height: 1.65;
+    }
+    .claim.is-does li::before   { content: "\25B8"; color: var(--radar-dry); }   /* ▸ */
+    .claim.is-doesnt li::before { content: "\2013"; color: var(--ink-soft); }    /* – */
+    @media (min-width: 640px) {
+      .claims { flex-direction: row; align-items: stretch; }
+      .claim { flex: 1 1 0; }
+    }
+
+    /* ---- live-model colophon card ---- */
+    .colophon {
+      display: flex; flex-direction: column; gap: var(--s-3);
+      padding: var(--s-4); background: var(--paper-2);
+      border: 1px solid var(--rule);
+    }
+    .colophon p {
+      font-family: "Newsreader", Georgia, serif;
+      font-size: 1.04rem; line-height: 1.55; color: var(--ink); max-width: 38rem;
+    }
+    .colophon .method-kicker { margin: 0; }
+
+    /* ---- footer ---- */
+    .foot {
+      display: flex; flex-direction: column; gap: 8px;
+      padding-top: var(--s-4); border-top: 2px solid var(--ink);
+      font-family: "IBM Plex Mono", monospace; font-size: .7rem;
+      letter-spacing: .02em; color: var(--ink-soft);
+    }
+    .foot .colo { line-height: 1.5; max-width: 40rem; }
+
+    @media (max-width: 380px) {
+      .doc { gap: var(--s-5); }
+      .topnav { gap: .8rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .topnav a, a { transition: none; }
+    }
+  </style>
+</body>
+</html>

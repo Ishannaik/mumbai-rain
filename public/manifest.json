@@ -1,0 +1,23 @@
+{
+  "name": "पाऊस — Mumbai Rain",
+  "short_name": "पाऊस",
+  "description": "Mumbai's monsoon nowcast — see whether rain will reach your exact spot in the next few hours, with a flood watch and air quality. Calibrated, locality-level, no sign-in.",
+  "id": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#dde2dc",
+  "theme_color": "#16221f",
+  "categories": ["weather", "utilities", "navigation"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}

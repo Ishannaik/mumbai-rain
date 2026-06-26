@@ -49,6 +49,7 @@ const defaultIdx = defaultLocality
   <meta name="theme-color" content="#dde2dc" />
   <meta name="color-scheme" content="light only" />
   <meta name="darkreader-lock" />
+  <link rel="manifest" href="/manifest.json" />
 
   <!-- Open Graph / social (helps the locality pages rank + share well) -->
   <meta property="og:type" content="website" />
@@ -87,6 +88,13 @@ const defaultIdx = defaultLocality
     <!-- Masthead: the Marathi anchor (identity, constant ink) + the picker. -->
     <header class="masthead">
       <span class="anchor" lang="mr">पाऊस</span>
+      <nav class="topnav" aria-label="Sections">
+        <a href="/" aria-current="page">Now</a>
+        <a href="/week">Week</a>
+        <a href="/air">Air</a>
+        <a href="/scoreboard">Scoreboard</a>
+        <a href="/about">About</a>
+      </nav>
       <span class="loc-pill">
         <span class="loc-pin" aria-hidden="true">📍</span>
         <select id="locality" aria-label="Choose your Mumbai area">
@@ -560,6 +568,14 @@ const defaultIdx = defaultLocality
       });
     }
 
+    // Fallback spot when geolocation is unavailable or denied: a central, iconic
+    // area — not whatever sorts first alphabetically (the 146-area OSM list opens
+    // on "Aadharwadi"). Keeps parity with the Week page's Colaba default.
+    function fallbackIdx() {
+      const i = LOCALITIES.findIndex((l) => l.name === "Colaba");
+      return i >= 0 ? i : 0;
+    }
+
     function resolveAndRender() {
       // Locality (SEO) pages pin a default; the home page uses geolocation.
       const pinned = (app.dataset.defaultLocality || "").trim();
@@ -567,7 +583,7 @@ const defaultIdx = defaultLocality
         const idx = LOCALITIES.findIndex((l) => l.name === pinned);
         if (idx >= 0) { selectIndex(idx); render(LOCALITIES[idx]); return; }
       }
-      if (!navigator.geolocation) { selectIndex(0); render(LOCALITIES[0]); return; }
+      if (!navigator.geolocation) { const di = fallbackIdx(); selectIndex(di); render(LOCALITIES[di]); return; }
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const here = nearestLocality(pos.coords.latitude, pos.coords.longitude);
@@ -576,7 +592,7 @@ const defaultIdx = defaultLocality
           selectIndex(LOCALITIES.findIndex((l) => l.name === here.name));
           render(loc);
         },
-        () => { selectIndex(0); render(LOCALITIES[0]); },
+        () => { const di = fallbackIdx(); selectIndex(di); render(LOCALITIES[di]); },
         { timeout: 8000, maximumAge: 600000 }
       );
     }
@@ -588,23 +604,23 @@ const defaultIdx = defaultLocality
     // <select>; if anything here throws, the bare <select> + its change handler
     // remain as the working fallback. Regions are ordered south → far-north, the
     // way each local-train line actually runs.
-    const REGIONS = [
-      { title: "South Mumbai",
-        names: ["Colaba", "Churchgate", "Byculla", "Lower Parel", "Worli"] },
-      { title: "Western Suburbs",
-        names: ["Bandra", "Santacruz", "Vile Parle", "Juhu", "Andheri",
-                "Jogeshwari", "Goregaon", "Malad", "Kandivali", "Borivali"] },
-      { title: "Central & Eastern Suburbs",
-        names: ["Dadar", "Matunga", "Mahim", "Sion", "Kurla",
-                "Ghatkopar", "Vikhroli", "Powai", "Bhandup"] },
-      { title: "Harbour & Navi Mumbai",
-        names: ["Wadala", "Chembur", "Airoli", "Vashi (Navi Mumbai)", "Nerul",
-                "Belapur", "Kharghar", "Panvel"] },
-      { title: "Thane & Far Suburbs",
-        names: ["Mulund", "Thane", "Dombivli", "Kalyan", "Ulhasnagar",
-                "Ambernath", "Badlapur", "Karjat", "Mira Road", "Bhayandar",
-                "Naigaon", "Vasai", "Nalasopara", "Virar"] },
+    // Region ORDER (south → far north/east), the way the local-train lines run.
+    const REGION_ORDER = [
+      "South Mumbai", "Western Suburbs", "Central & Eastern Suburbs",
+      "Harbour & Navi Mumbai", "Thane & Far Suburbs",
     ];
+    // Classify an area into a region by coordinate bands — data-driven, so the
+    // locality list can grow (now ~146 areas from OpenStreetMap) without a hand-
+    // maintained name list. Mumbai doesn't fall into clean rectangles, so these
+    // thresholds are tuned against the major stations (Thane, Panvel, Dahisar);
+    // the trailing "More areas" group still catches anything that slips through.
+    function regionOf({ lat, lon }) {
+      if (lat <= 19.02 && lon <= 72.86) return "South Mumbai";
+      if (lon >= 72.985 && lat <= 19.17) return "Harbour & Navi Mumbai";
+      if (lat >= 19.27 || lon >= 73.00 || (lat >= 19.19 && lon >= 72.96)) return "Thane & Far Suburbs";
+      if (lon < 72.875) return "Western Suburbs";
+      return "Central & Eastern Suburbs";
+    }
 
     function initPicker() {
       // Native fallback: if the custom picker can't build, the still-visible
@@ -618,20 +634,21 @@ const defaultIdx = defaultLocality
       }
     }
 
-    // Order LOCALITIES into region groups; any unmapped area lands in a trailing
-    // "More areas" group so a data change can never silently drop a locality.
+    // Bucket LOCALITIES into the ordered regions via regionOf, each sorted
+    // south→north (by latitude). Anything an unforeseen case misses lands in a
+    // trailing "More areas" group so a data change can never silently drop one.
     function groupLocalities() {
-      const seen = new Set();
-      const groups = REGIONS.map((r) => {
-        const items = [];
-        r.names.forEach((n) => {
-          const i = LOCALITIES.findIndex((l) => l.name === n);
-          if (i >= 0 && !seen.has(i)) { seen.add(i); items.push(i); }
-        });
-        return { title: r.title, items };
-      }).filter((g) => g.items.length);
-      const rest = LOCALITIES.map((_, i) => i).filter((i) => !seen.has(i));
-      if (rest.length) groups.push({ title: "More areas", items: rest });
+      const buckets = new Map(REGION_ORDER.map((t) => [t, []]));
+      const rest = [];
+      LOCALITIES.forEach((l, i) => {
+        const r = regionOf(l);
+        if (buckets.has(r)) buckets.get(r).push(i); else rest.push(i);
+      });
+      const byLat = (a, b) => LOCALITIES[a].lat - LOCALITIES[b].lat;
+      const groups = REGION_ORDER
+        .map((t) => ({ title: t, items: buckets.get(t).sort(byLat) }))
+        .filter((g) => g.items.length);
+      if (rest.length) groups.push({ title: "More areas", items: rest.sort(byLat) });
       return groups;
     }
 
@@ -933,6 +950,13 @@ const defaultIdx = defaultLocality
     }
 
     init();
+  </script>
+
+  <!-- PWA: register the service worker (offline shell + last-forecast cache). -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+    }
   </script>
 </body>
 </html>

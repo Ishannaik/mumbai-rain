@@ -141,6 +141,19 @@ body::before {
   gap: var(--s-4); flex-wrap: wrap;
   border-bottom: 2px solid var(--ink); padding-bottom: var(--s-3);
 }
+/* Section nav (Now / Week / Air / Scoreboard / About) — sits in the masthead.
+   Sub-pages carry their own scoped copy; this styles the Now + locality pages. */
+.topnav {
+  display: flex; flex-wrap: wrap; gap: .15rem 1rem;
+  font-family: "IBM Plex Mono", monospace; font-size: .7rem;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.topnav a {
+  color: var(--ink-soft); text-decoration: none;
+  padding: .15rem 0; border-bottom: 1px solid transparent;
+}
+.topnav a:hover { color: var(--ink); }
+.topnav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink); }
 .anchor {
   font-family: "Tiro Devanagari Marathi", serif;
   font-size: clamp(2rem, 9vw, 2.8rem); line-height: .86; color: var(--ink);
