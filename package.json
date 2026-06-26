@@ -6,9 +6,13 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "quality": "fallow dead-code; fallow dupes; fallow health"
   },
   "dependencies": {
     "astro": "^7.0.3"
+  },
+  "devDependencies": {
+    "fallow": "^2.102.0"
   }
 }
