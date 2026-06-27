@@ -1,9 +1,25 @@
 {
-  "version": 1,
-  "trained_at": "2026-06-24T00:00:00Z",
-  "features": ["fc_bestmatch_mm", "fc_ecmwf_mm", "hour_sin", "hour_cos", "recent_rain_mm"],
-  "weights": [1.0, 0.0, 0.0, 0.0, 0.0],
-  "intercept": 0.0,
-  "champion_mae": null,
-  "ecmwf_mae": null
+  "type": "logistic",
+  "features": [
+    "fc_bestmatch_mm",
+    "fc_ecmwf_mm",
+    "hour_sin",
+    "hour_cos",
+    "recent_rain_mm"
+  ],
+  "weights": [
+    0.270586,
+    0.290361,
+    1.518589,
+    -0.256607,
+    -1.441479
+  ],
+  "intercept": -2.511305,
+  "trained_at": "2026-06-27T05:06:06Z",
+  "n_train": 208,
+  "n_test": 52,
+  "brier": 0.0754,
+  "raw_brier": 0.3846,
+  "clim_brier": 0.0718,
+  "champion_brier": null
 }
