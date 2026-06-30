@@ -8,18 +8,18 @@
     "recent_rain_mm"
   ],
   "weights": [
-    0.270586,
-    0.290361,
-    1.518589,
-    -0.256607,
-    -1.441479
+    0.713944,
+    0.454317,
+    0.760711,
+    0.563787,
+    0.216647
   ],
-  "intercept": -2.511305,
-  "trained_at": "2026-06-27T05:06:06Z",
-  "n_train": 208,
-  "n_test": 52,
-  "brier": 0.0754,
-  "raw_brier": 0.3846,
-  "clim_brier": 0.0718,
-  "champion_brier": null
+  "intercept": -2.597134,
+  "trained_at": "2026-06-30T05:35:48Z",
+  "n_train": 684,
+  "n_test": 172,
+  "brier": 0.2095,
+  "raw_brier": 0.4535,
+  "clim_brier": 0.4286,
+  "champion_brier": 0.5387
 }
