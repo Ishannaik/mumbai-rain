@@ -2,8 +2,9 @@
 // scoreboard.astro — THE HONESTY BOARD. The transparency differentiator no
 // competitor publishes: every forecast we log, graded against what Mumbai's
 // airport (METAR/VABB) actually observed. Zero-JS — every number on this page
-// is computed AT BUILD TIME from data/log.csv, so the daily GitHub Actions
-// build re-bakes the board. Nothing here runs in the browser. The <head> +
+// is computed AT BUILD TIME from data/log.csv, so every push to main (the hourly
+// collector commits ~10×/day) triggers a Vercel rebuild that re-bakes the board.
+// Nothing here runs in the browser. The <head> +
 // masthead + nav + footer wrapper come from the shared section shell (Page.astro).
 import Page from "../layouts/Page.astro";
 import fs from "node:fs";
@@ -89,6 +90,12 @@ const pctToLive = Math.max(0, Math.min(100, Math.round((nLab / MIN_ROWS) * 100))
 const remaining = Math.max(0, MIN_ROWS - nLab);
 
 const builtAt = new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
+
+// Freshness: the most recent forecast-hour that has actually been graded, so a
+// visitor sees how current the board is — not just when it was baked. valid_at is
+// an IST "YYYY-MM-DDTHH:00" string (Asia/Kolkata), so lexical max = chronological max.
+const lastGraded = labelled.reduce((m, r) => (r.valid_at > m ? r.valid_at : m), "");
+const dataThrough = lastGraded ? lastGraded.replace("T", " ") + " IST" : null;
 
 const title = "पाऊस · Scoreboard — model vs. raw forecast";
 const description =
@@ -282,6 +289,7 @@ const description =
       Ground truth: NOAA METAR, station VABB (Mumbai airport).
     </p>
     <p class="sb-built">Baked at build · {builtAt}</p>
+    {dataThrough && <p class="sb-built">Data through {dataThrough}</p>}
   </footer>
 </Page>
 
