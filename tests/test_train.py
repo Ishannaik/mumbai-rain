@@ -1,6 +1,7 @@
 import math
 from pipeline.train import (row_to_features, brier, sigmoid, predict_proba,
-                            passes_gate, train_classifier, build_xy, matured, FEATURE_NAMES)
+                            passes_gate, train_classifier, build_xy, matured, FEATURE_NAMES,
+                            should_demote, raw_passthrough_model, _load_champion)
 
 
 def test_row_to_features_shape_and_cyclic_hour():
@@ -48,3 +49,40 @@ def test_train_classifier_learns_separable_signal():
     dry = predict_proba(m, row_to_features(rows[0]))
     wet = predict_proba(m, row_to_features(rows[-1]))
     assert wet > dry
+
+
+def test_demote_when_champion_worse_than_raw():
+    # today's real situation: champion 0.1783 lost to raw 0.1724 -> demote
+    assert should_demote(0.1783, 0.1724) is True
+
+
+def test_no_demote_when_champion_beats_raw():
+    assert should_demote(0.15, 0.1724) is False
+
+
+def test_no_demote_when_no_logistic_champion():
+    # champ_b is None (serving raw already) -> nothing to demote
+    assert should_demote(None, 0.1724) is False
+
+
+def test_no_demote_on_tie():
+    # tie keeps the champion, mirroring passes_gate's strict '>'
+    assert should_demote(0.1724, 0.1724) is False
+
+
+def test_passthrough_serves_raw_and_is_ignored_as_champion():
+    m = raw_passthrough_model(0.1724, 0.3384, 0.1783, 100, 25, "2026-07-03T16:00:00Z")
+    assert m["type"] != "logistic"            # so nowcast.js serves it as raw...
+    assert m["weights"] == [1.0, 0.0, 0.0, 0.0, 0.0]  # predict = max(0, fc_bestmatch_mm)
+    assert m["intercept"] == 0.0
+    assert m["features"] == FEATURE_NAMES
+    assert m["brier"] == 0.1724 and m["raw_brier"] == 0.1724
+    assert m["champion_brier"] == 0.1783
+    assert set(m) == {"type", "features", "weights", "intercept", "trained_at",
+                      "n_train", "n_test", "brier", "raw_brier", "clim_brier", "champion_brier"}
+
+
+def test_promotion_gate_unchanged():
+    # regression guard: the existing gate still behaves
+    assert passes_gate(0.10, 0.20, 0.15) is True     # beats champ & raw
+    assert passes_gate(0.16, 0.20, 0.15) is False    # loses to raw

@@ -65,6 +65,34 @@ def passes_gate(cand_brier, champ_brier, raw_brier):
     return True
 
 
+def should_demote(champ_b, raw_b):
+    """True when a STANDING logistic champion no longer beats the raw forecast on the
+    fresh holdout (champ_b > raw_b) — it must re-earn its place under the SAME bar a new
+    candidate faces in passes_gate. champ_b is None when there's no logistic champion
+    (already serving raw) → nothing to demote. Strict '>' so a tie keeps the champion,
+    mirroring passes_gate's 'cand_brier > raw_brier' rejection."""
+    return champ_b is not None and champ_b > raw_b
+
+
+def raw_passthrough_model(raw_b, clim_b, champ_b, n_train, n_test, trained_at):
+    """A model.json that serves the raw Open-Meteo forecast: linear, weights [1,0,0,0,0],
+    intercept 0 -> predict = max(0, fc_bestmatch_mm). type='raw' (not 'logistic') so the
+    browser's linear path serves it as raw AND the next retrain's _load_champion ignores it.
+    Keeps the stable model.json schema (same keys as a promoted model)."""
+    return {
+        "type": "raw",
+        "features": FEATURE_NAMES,
+        "weights": [1.0, 0.0, 0.0, 0.0, 0.0],
+        "intercept": 0.0,
+        "trained_at": trained_at,
+        "n_train": n_train, "n_test": n_test,
+        "brier": round(raw_b, 4),          # it now IS raw, so its Brier == raw's
+        "raw_brier": round(raw_b, 4),
+        "clim_brier": round(clim_b, 4),
+        "champion_brier": round(champ_b, 4) if champ_b is not None else None,
+    }
+
+
 def train_classifier(X, y):
     clf = LogisticRegression(max_iter=1000).fit(X, y)
     return {
@@ -125,6 +153,14 @@ def main():
         with open(MODEL_PATH, "w") as f:
             json.dump(candidate, f, indent=2)
         print("PROMOTED — beats raw forecast AND champion.")
+    elif should_demote(champ_b, raw_b):
+        demoted = raw_passthrough_model(
+            raw_b, clim_b, champ_b, len(train_rows), len(test_rows),
+            datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+        with open(MODEL_PATH, "w") as f:
+            json.dump(demoted, f, indent=2)
+        print(f"DEMOTED to raw — champion (Brier {champ_b:.4f}) no longer beats raw "
+              f"({raw_b:.4f}). Serving the forecast until a model beats it.")
     else:
         print("Rejected — did not beat both baselines. Champion kept.")
 
