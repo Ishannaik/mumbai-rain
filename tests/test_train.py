@@ -1,7 +1,7 @@
 import math
 from pipeline.train import (row_to_features, brier, sigmoid, predict_proba,
                             passes_gate, train_classifier, build_xy, matured, FEATURE_NAMES,
-                            should_demote, raw_passthrough_model, _load_champion)
+                            should_demote, raw_passthrough_model)
 
 
 def test_row_to_features_shape_and_cyclic_hour():
