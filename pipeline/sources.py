@@ -2,11 +2,29 @@
 
 Open-Meteo is a free, keyless delivery pipe for global weather models (GFS, ICON,
 ECMWF incl. the AIFS AI model) — NOT a source of ground truth. Every value here is
-model output. Truth/labels come from NASA GPM IMERG on the CI path (see pipeline/labels).
+model output. Truth/labels come from METAR (NOAA Aviation Weather, station VABB) on
+the CI path (see pipeline/labels).
 """
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 BASE = "https://api.open-meteo.com/v1/forecast"
+TIMEOUT = 30  # seconds; Open-Meteo can be slow under load (was 20 → ReadTimeout in CI)
+
+# One shared session with retry/backoff so a transient 5xx or read-timeout doesn't drop
+# a whole hourly snapshot. backoff_factor=1 → sleeps 0s, 2s, 4s between the 3 attempts.
+_session = requests.Session()
+_session.mount("https://", HTTPAdapter(max_retries=Retry(
+    total=3, backoff_factor=1.0,
+    status_forcelist=(429, 500, 502, 503, 504),
+    allowed_methods=frozenset(["GET"]),
+)))
+
+
+def _get(url: str):
+    """Single choke point for every Open-Meteo GET: shared session, retry/backoff, timeout."""
+    return _session.get(url, timeout=TIMEOUT)
 
 
 def build_forecast_url(lat: float, lon: float) -> str:
@@ -39,8 +57,8 @@ def parse_forecast(raw_best: dict, raw_ecmwf: dict) -> dict:
 
 
 def fetch_forecast(lat: float, lon: float) -> dict:
-    raw_best = requests.get(build_forecast_url(lat, lon), timeout=20).json()
-    raw_ecmwf = requests.get(_ecmwf_url(lat, lon), timeout=20).json()
+    raw_best = _get(build_forecast_url(lat, lon)).json()
+    raw_ecmwf = _get(_ecmwf_url(lat, lon)).json()
     return parse_forecast(raw_best, raw_ecmwf)
 
 
@@ -50,6 +68,6 @@ def fetch_recent_rain_mm(lat: float, lon: float) -> float:
     recent value is a fine input — it's the strongest 0-2h predictor.)"""
     url = (f"{BASE}?latitude={lat}&longitude={lon}&hourly=precipitation"
            f"&past_days=1&forecast_days=0&timezone=Asia%2FKolkata")
-    vals = requests.get(url, timeout=20).json()["hourly"]["precipitation"]
+    vals = _get(url).json()["hourly"]["precipitation"]
     recent = [v for v in vals[-3:] if isinstance(v, (int, float))]
     return round(sum(recent), 2)

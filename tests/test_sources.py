@@ -27,3 +27,14 @@ def test_parse_forecast_missing_ecmwf_time_is_none_not_zero():
     raw_ecmwf = {"hourly": {"time": ["2026-06-23T00:00"], "precipitation": [1.1]}}
     out = parse_forecast(raw_best, raw_ecmwf)
     assert out["fc_ecmwf_mm"] == [1.1, None]
+
+
+def test_get_session_has_retry_and_backoff():
+    # A transient 5xx/timeout must not drop a whole hourly snapshot: the shared
+    # session retries with backoff. (No network — inspect the mounted adapter.)
+    from pipeline.sources import _session, TIMEOUT
+    retries = _session.get_adapter("https://api.open-meteo.com/v1/forecast").max_retries
+    assert retries.total == 3
+    assert retries.backoff_factor >= 1.0
+    assert 429 in retries.status_forcelist and 503 in retries.status_forcelist
+    assert TIMEOUT >= 30
