@@ -137,7 +137,7 @@ const defaultIdx = defaultLocality
     <!-- Ground reality — quiet, tabular, like a ticket stub under the headline. -->
     <dl class="details">
       <div class="row" id="measured-row">
-        <dt>measured now</dt>
+        <dt>est. rain now</dt>
         <dd id="measured">—</dd>
       </div>
       <div class="row" id="flood-row" hidden>
@@ -318,9 +318,11 @@ const defaultIdx = defaultLocality
     }
 
     function renderMeasured(current) {
+      // Open-Meteo current.precipitation is a MODEL estimate, not a station reading —
+      // labelled "est. rain now". When it's missing, show "—", never a fabricated 0.
       const mm = current && typeof current.precipitation === "number"
-        ? current.precipitation : 0;
-      elMeasured.textContent = `${mm.toFixed(1)} mm`;
+        ? current.precipitation : null;
+      elMeasured.textContent = mm === null ? "—" : `${mm.toFixed(1)} mm`;
     }
 
     function renderFlood(loc, v) {
