@@ -62,12 +62,28 @@ def fetch_forecast(lat: float, lon: float) -> dict:
     return parse_forecast(raw_best, raw_ecmwf)
 
 
+def recent_rain_from_series(times, precip, now_stamp):
+    """Pure. Sum precipitation over the 3 hours STRICTLY BEFORE `now_stamp`, mirroring
+    the browser's shapeForecast() in src/layouts/Almanac.astro:
+        i = first index whose hour >= now;  window = precip[i-3 : i];  None -> 0.
+    `times` and `now_stamp` are IST 'YYYY-MM-DDTHH:MM' strings (Asia/Kolkata), compared
+    on the 'YYYY-MM-DDTHH' hour prefix. Returns mm rounded to 2 dp (stored-column parity).
+    This is a FEATURE, not a label — circularity only matters for the METAR label."""
+    key = now_stamp[:13]
+    i = next((k for k, t in enumerate(times) if t[:13] >= key), len(times) - 1)
+    window = precip[max(0, i - 3):i]
+    total = sum(v for v in window if isinstance(v, (int, float)))
+    return round(total, 2)
+
+
 def fetch_recent_rain_mm(lat: float, lon: float) -> float:
-    """Sum of the last 3 hours of Open-Meteo precipitation — a FEATURE, not a label.
-    (Circularity only matters for the label, which comes from METAR. The forecast's own
-    recent value is a fine input — it's the strongest 0-2h predictor.)"""
-    url = (f"{BASE}?latitude={lat}&longitude={lon}&hourly=precipitation"
-           f"&past_days=1&forecast_days=0&timezone=Asia%2FKolkata")
-    vals = _get(url).json()["hourly"]["precipitation"]
-    recent = [v for v in vals[-3:] if isinstance(v, (int, float))]
-    return round(sum(recent), 2)
+    """Rolling sum of the last 3 hours of precipitation, ending at (excluding) the current
+    hour — the SAME window the browser computes in shapeForecast(), so the model is trained
+    and served on the same feature. (Was: yesterday 21:00-23:00, constant across a day.)
+    `current.time` is Open-Meteo's current IST instant, exactly what the client reads."""
+    url = (f"{BASE}?latitude={lat}&longitude={lon}"
+           f"&hourly=precipitation&current=precipitation"
+           f"&past_days=1&forecast_days=1&timezone=Asia%2FKolkata")
+    raw = _get(url).json()
+    return recent_rain_from_series(
+        raw["hourly"]["time"], raw["hourly"]["precipitation"], raw["current"]["time"])
