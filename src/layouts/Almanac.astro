@@ -339,6 +339,13 @@ const defaultIdx = defaultLocality
     }
 
     function renderFooter() {
+      // Honesty: a non-logistic model.json means the calibrated model was demoted to a
+      // raw passthrough (train.py: no model currently beats the raw forecast). Don't claim
+      // "calibrated" when we're serving the plain forecast.
+      if (MODEL.type !== "logistic") {
+        elHonesty.textContent = "showing the raw forecast — no model beats it yet";
+        return;
+      }
       const ver = MODEL.version != null
         ? `v${MODEL.version}`
         : (MODEL.trained_at ? MODEL.trained_at.slice(0, 10) : "live");
