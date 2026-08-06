@@ -1,12 +1,12 @@
 ---
 // scoreboard.astro — THE HONESTY BOARD. Every forecast we log, graded against
 // METAR/VABB. Zero-JS: numbers baked at build from data/log.csv + public/model.json.
+//
+// ROBUSTNESS: loadLogCsv({ required: true }) THROWS if the diary is missing or
+// corrupt — the build fails instead of shipping a silent empty "Couldn't read
+// the log" page that a service worker can cache forever.
 import Page from "../layouts/Page.astro";
-import fs from "node:fs";
-import path from "node:path";
-
-const LOG_PATH = path.join(process.cwd(), "data", "log.csv");
-const MODEL_PATH = path.join(process.cwd(), "public", "model.json");
+import { loadLogCsv, loadModelJson } from "../lib/log-csv.js";
 
 // Must match pipeline/train.py RAIN_MM and nowcast.js RAIN_THRESHOLD_MM.
 const RAIN_TH = 0.3;
@@ -29,35 +29,20 @@ type Model = {
   n_test?: number;
 };
 
-function loadRows(): Row[] | null {
-  try {
-    const raw = fs.readFileSync(LOG_PATH, "utf8");
-    const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    if (lines.length < 2) return [];
-    const header = lines[0].split(",").map((h) => h.trim());
-    return lines.slice(1).map((line) => {
-      const cells = line.split(",");
-      const o: Row = {};
-      header.forEach((h, i) => (o[h] = (cells[i] ?? "").trim()));
-      return o;
-    });
-  } catch {
-    return null;
-  }
-}
+// Fail the build loudly if data/log.csv is missing/unreadable. Empty diary
+// (header only) is allowed → rows=[] → "No snapshots logged yet."
+const logLoad = loadLogCsv({ required: true });
+const data: Row[] = (logLoad.rows ?? []) as Row[];
+const logPathUsed = logLoad.path;
 
-function loadModel(): Model | null {
-  try {
-    return JSON.parse(fs.readFileSync(MODEL_PATH, "utf8")) as Model;
-  } catch {
-    return null;
-  }
+const modelLoad = loadModelJson();
+const model = modelLoad.model as Model | null;
+if (modelLoad.error) {
+  // Model is optional for the raw-stats half of the board — warn, don't fail.
+  console.warn(`[scoreboard] ${modelLoad.error}`);
 }
-
-const rows = loadRows();
-const readOk = rows !== null;
-const data: Row[] = rows ?? [];
-const model = loadModel();
+// Always true now that required load throws on failure; kept so templates stay clear.
+const readOk = true;
 
 const num = (v: string): number => {
   const n = Number(v);
@@ -242,13 +227,6 @@ const description =
           <> · Numbers below may not reflect the last day of weather.</>
         )}
       </p>
-    </section>
-  )}
-
-  {!readOk && (
-    <section class="sb-empty" role="status">
-      <p class="sb-empty-h">Couldn't read the log.</p>
-      <p class="sb-empty-p">The board re-bakes on the next data push (roughly hourly) — check back shortly.</p>
     </section>
   )}
 
@@ -496,6 +474,7 @@ const description =
       Health: <a href="/metrics.json"><code>metrics.json</code></a>.
     </p>
     <p class="sb-built">Baked at build · {builtAt}</p>
+    {logPathUsed && <p class="sb-built">Log · {logPathUsed.replace(/\\/g, "/").split("/").slice(-2).join("/")}</p>}
     {dataThrough && <p class="sb-built">Data through {dataThrough}</p>}
     {lastIssuedLabel && <p class="sb-built">Last collect · {lastIssuedLabel}
       {hoursStale != null && <> · {hoursStale.toFixed(1)}h ago</>}

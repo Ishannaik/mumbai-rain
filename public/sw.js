@@ -1,17 +1,25 @@
 // पाऊस — Mumbai Rain · service worker (dependency-free, no build step).
 // Offline-first app shell + last-forecast fallback. Bump CACHE to ship new assets;
 // the activate handler then evicts every older cache.
+//
+// ROBUSTNESS (paus-v2): HTML navigations are NETWORK-FIRST so a bad/stale
+// scoreboard bake ("Couldn't read the log") can never stick in cache-first
+// forever. Static assets stay cache-first.
 
-const CACHE = "paus-v1";
+const CACHE = "paus-v2";
 
 // Only stable, path-addressable URLs are precached. Astro's hashed JS/CSS bundles
 // are NOT listed here (their names change every build) — they are picked up at
 // runtime by the cache-first handler below, so no build hash is ever hardcoded.
-const PRECACHE = ["/", "/data/localities.json", "/model.json"];
+const PRECACHE = ["/", "/data/localities.json", "/model.json", "/metrics.json"];
 
 // Live data endpoints — network-first so a fresh reading always wins, while the
 // last successful response is kept so the most recent forecast still shows offline.
 const NETWORK_FIRST_HOSTS = ["api.open-meteo.com", "air-quality-api.open-meteo.com"];
+
+// Same-origin paths that must never be stuck on a stale HTML/JSON snapshot.
+// Scoreboard + metrics change with every data push; cache-first hid failures.
+const NETWORK_FIRST_PATHS = ["/scoreboard", "/metrics.json", "/model.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -26,8 +34,8 @@ self.addEventListener("install", (event) => {
       )
     )
   );
-  // Intentionally no skipWaiting(): an updated worker waits until existing tabs
-  // close, so a page is never served a half-old / half-new asset set mid-session.
+  // Take over ASAP so clients leave paus-v1 (cache-first HTML) behind.
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -37,8 +45,6 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
       )
-      // Safe to claim: with no skipWaiting this only runs once the old worker is
-      // gone, and it lets the very first install control the open page immediately.
       .then(() => self.clients.claim())
   );
 });
@@ -55,11 +61,26 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Same-origin GETs → cache-first, runtime-caching anything new (hashed bundles).
-  if (url.origin === self.location.origin) {
-    event.respondWith(cacheFirst(req));
+  if (url.origin !== self.location.origin) {
+    // Cross-origin fonts, etc. — browser default.
+    return;
   }
-  // Everything else (cross-origin fonts, etc.) falls through to the network as-is.
+
+  // HTML documents + honesty-critical JSON → always prefer network.
+  // This is the fix for "randomly seeing Couldn't read the log": that page was
+  // a failed build cached forever under cache-first.
+  const isNavigate = req.mode === "navigate";
+  const acceptsHtml = (req.headers.get("accept") || "").includes("text/html");
+  const isNetworkPath = NETWORK_FIRST_PATHS.some(
+    (p) => url.pathname === p || url.pathname.startsWith(p + "/")
+  );
+  if (isNavigate || acceptsHtml || isNetworkPath) {
+    event.respondWith(networkFirst(req));
+    return;
+  }
+
+  // Hashed static assets (JS/CSS/images) → cache-first.
+  event.respondWith(cacheFirst(req));
 });
 
 async function cacheFirst(req) {
@@ -86,12 +107,17 @@ async function cacheFirst(req) {
 async function networkFirst(req) {
   const cache = await caches.open(CACHE);
   try {
-    const res = await fetch(req);
+    const res = await fetch(req, { cache: "no-cache" });
     if (res && res.status === 200) cache.put(req, res.clone());
     return res;
   } catch (err) {
     const cached = await cache.match(req);
     if (cached) return cached;
-    throw err; // truly offline and never fetched before → let the page handle it
+    // Offline navigation: fall back to home shell if we have it.
+    if (req.mode === "navigate") {
+      const shell = await caches.match("/");
+      if (shell) return shell;
+    }
+    throw err;
   }
 }
