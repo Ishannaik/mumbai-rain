@@ -1,18 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="पाऊस — Mumbai Rain">
-  <title>पाऊस — Mumbai Rain</title>
-  <!-- Full-bleed storm-ink field. Maskable: the background reaches every edge so
-       no OS mask shape (circle, squircle, rounded square) ever exposes a corner. -->
-  <rect width="512" height="512" fill="#16221f"/>
-  <!-- Motif kept inside the ~80% maskable safe zone (a circle r≈205 at 256,256),
-       centred: a wet-newsprint raindrop above rising-water ripples, with one thin
-       radar-blue waterline as the live accent. -->
-  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <!-- raindrop (wet newsprint) -->
-    <path d="M256 120 C272 164 320 198 320 228 A64 64 0 1 1 192 228 C192 198 240 164 256 120 Z" fill="#dde2dc"/>
-    <!-- rising water: two wet-newsprint ripples -->
-    <path d="M132 362 q31 -17 62 0 t62 0 t62 0 t62 0" stroke="#dde2dc" stroke-width="16"/>
-    <path d="M150 392 q26.5 -15 53 0 t53 0 t53 0 t53 0" stroke="#dde2dc" stroke-width="16" opacity="0.78"/>
-    <!-- the current waterline — thin radar-blue accent, drawn on top -->
-    <path d="M120 332 q34 -18 68 0 t68 0 t68 0 t68 0" stroke="#2f7db0" stroke-width="13"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" aria-label="पाऊस — Mumbai Rain" role="img" viewBox="0 0 512 512"><title>पाऊस — Mumbai Rain</title><rect width="512" height="512" fill="#16221f"/><g fill="none" stroke-linecap="round" stroke-linejoin="round"><path fill="#dde2dc" d="M256 120 C272 164 320 198 320 228 A64 64 0 1 1 192 228 C192 198 240 164 256 120 Z"/><path stroke="#dde2dc" stroke-width="16" d="M132 362 q31 -17 62 0 t62 0 t62 0 t62 0"/><path stroke="#dde2dc" stroke-width="16" d="M150 392 q26.5 -15 53 0 t53 0 t53 0 t53 0" opacity=".78"/><path stroke="#2f7db0" stroke-width="13" d="M120 332 q34 -18 68 0 t68 0 t68 0 t68 0"/></g></svg>
