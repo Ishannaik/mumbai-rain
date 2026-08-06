@@ -14,7 +14,9 @@ from sklearn.linear_model import LogisticRegression
 MODEL_PATH = "public/model.json"  # Astro serves this at /model.json (was web/model.json pre-Astro)
 LOG_PATH = "data/log.csv"
 MIN_ROWS = 200  # ~8-9 days of labelled data before a model is trustworthy
-RAIN_MM = 0.1   # the raw-forecast baseline's rain threshold
+# Must match nowcast.js RAIN_THRESHOLD_MM and scoreboard RAIN_TH — one product definition
+# of "raw rain call" (~noticeable drizzle). Labels remain METAR RA/DZ, not mm.
+RAIN_MM = 0.3
 FEATURE_NAMES = ["fc_bestmatch_mm", "fc_ecmwf_mm", "hour_sin", "hour_cos", "recent_rain_mm"]
 
 
@@ -55,23 +57,31 @@ def predict_proba(model, feats):
     return sigmoid(z)
 
 
-def passes_gate(cand_brier, champ_brier, raw_brier):
-    """Promote only if the candidate beats the raw forecast AND the current champion.
-    Monotonic improvement — the live model can only be replaced by a better one."""
+def passes_gate(cand_brier, champ_brier, raw_brier, clim_brier=None):
+    """Promote only if the candidate beats raw, climatology (when provided), AND champion.
+    Monotonic improvement — the live model can only be replaced by a better one.
+    clim_brier is optional for back-compat with older tests; train always passes it."""
     if cand_brier > raw_brier:
+        return False
+    if clim_brier is not None and cand_brier > clim_brier:
         return False
     if champ_brier is not None and cand_brier > champ_brier:
         return False
     return True
 
 
-def should_demote(champ_b, raw_b):
-    """True when a STANDING logistic champion no longer beats the raw forecast on the
-    fresh holdout (champ_b > raw_b) — it must re-earn its place under the SAME bar a new
-    candidate faces in passes_gate. champ_b is None when there's no logistic champion
-    (already serving raw) → nothing to demote. Strict '>' so a tie keeps the champion,
-    mirroring passes_gate's 'cand_brier > raw_brier' rejection."""
-    return champ_b is not None and champ_b > raw_b
+def should_demote(champ_b, raw_b, clim_b=None):
+    """True when a STANDING logistic champion no longer beats the raw forecast (or clim)
+    on the fresh holdout — it must re-earn its place under the same bar a candidate faces.
+    champ_b is None when there's no logistic champion → nothing to demote.
+    Strict '>' so a tie keeps the champion."""
+    if champ_b is None:
+        return False
+    if champ_b > raw_b:
+        return True
+    if clim_b is not None and champ_b > clim_b:
+        return True
+    return False
 
 
 def raw_passthrough_model(raw_b, clim_b, champ_b, n_train, n_test, trained_at):
@@ -147,22 +157,23 @@ def main():
         "champion_brier": round(champ_b, 4) if champ_b is not None else None,
     })
     print(f"candidate Brier={cand_b:.4f}  raw-forecast={raw_b:.4f}  "
-          f"climatology={clim_b:.4f}  champion={champ_b}")
+          f"climatology={clim_b:.4f}  champion={champ_b}  "
+          f"(raw rain ≥ {RAIN_MM} mm/h)")
 
-    if passes_gate(cand_b, champ_b, raw_b):
+    if passes_gate(cand_b, champ_b, raw_b, clim_b):
         with open(MODEL_PATH, "w") as f:
             json.dump(candidate, f, indent=2)
-        print("PROMOTED — beats raw forecast AND champion.")
-    elif should_demote(champ_b, raw_b):
+        print("PROMOTED — beats raw forecast, climatology, AND champion.")
+    elif should_demote(champ_b, raw_b, clim_b):
         demoted = raw_passthrough_model(
             raw_b, clim_b, champ_b, len(train_rows), len(test_rows),
             datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
         with open(MODEL_PATH, "w") as f:
             json.dump(demoted, f, indent=2)
         print(f"DEMOTED to raw — champion (Brier {champ_b:.4f}) no longer beats raw "
-              f"({raw_b:.4f}). Serving the forecast until a model beats it.")
+              f"({raw_b:.4f}) and/or clim ({clim_b:.4f}). Serving the forecast until a model beats it.")
     else:
-        print("Rejected — did not beat both baselines. Champion kept.")
+        print("Rejected — did not beat raw + clim + champion. Champion kept.")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,20 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://mumbai-rain.vercel.app/sitemap-index.xml
+# AI / research crawlers — public method docs welcome
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+Sitemap: https://rain.ishannaik.com/sitemap-index.xml

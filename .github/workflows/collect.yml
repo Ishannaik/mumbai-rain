@@ -27,10 +27,12 @@ jobs:
         run: uv sync --frozen
       - name: Log one snapshot (forecast + backfill METAR labels)
         run: uv run python -m pipeline.log_snapshot
-      - name: Commit new rows
+      - name: Refresh health metrics
+        run: uv run python -m pipeline.health
+      - name: Commit new rows + metrics
         run: |
           git config user.name "rain-bot"
           git config user.email "rain-bot@users.noreply.github.com"
-          git add data/log.csv
+          git add data/log.csv public/metrics.json
           git diff --cached --quiet || git commit -m "data: hourly snapshot [skip ci]"
           git push

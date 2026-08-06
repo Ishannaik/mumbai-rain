@@ -1,36 +1,39 @@
 ---
-// scoreboard.astro — THE HONESTY BOARD. The transparency differentiator no
-// competitor publishes: every forecast we log, graded against what Mumbai's
-// airport (METAR/VABB) actually observed. Zero-JS — every number on this page
-// is computed AT BUILD TIME from data/log.csv, so every push to main (the hourly
-// collector commits ~10×/day) triggers a Vercel rebuild that re-bakes the board.
-// Nothing here runs in the browser. The <head> +
-// masthead + nav + footer wrapper come from the shared section shell (Page.astro).
+// scoreboard.astro — THE HONESTY BOARD. Every forecast we log, graded against
+// METAR/VABB. Zero-JS: numbers baked at build from data/log.csv + public/model.json.
 import Page from "../layouts/Page.astro";
 import fs from "node:fs";
 import path from "node:path";
 
-// --- build-time read of the cron's labelled log -------------------------------
-// Resolve from the project root via process.cwd() — the dir `astro build` runs in
-// (locally and on Vercel, where data/log.csv is committed). NOT import.meta.url,
-// which resolves into dist/ at build time and 404s the file (renders the empty
-// "couldn't read" state). Mirrors pipeline/log_snapshot.py's LOG_PATH = "data/log.csv".
 const LOG_PATH = path.join(process.cwd(), "data", "log.csv");
+const MODEL_PATH = path.join(process.cwd(), "public", "model.json");
 
-// Definitions mirrored from the codebase so the board never invents its own:
-//   RAIN_TH  — nowcast.js RAIN_THRESHOLD_MM (0.3): the same "is it raining" line
-//              the Now page draws on the raw forecast.
-//   MIN_ROWS — train.py MIN_ROWS (200): labelled rows before a model is trusted.
+// Must match pipeline/train.py RAIN_MM and nowcast.js RAIN_THRESHOLD_MM.
 const RAIN_TH = 0.3;
 const MIN_ROWS = 200;
+const RAIN_PROB = 0.5;
+const STALE_WARN_H = 6;
+const STALE_FAIL_H = 24;
 
 type Row = Record<string, string>;
+type Model = {
+  type?: string;
+  weights?: number[];
+  intercept?: number;
+  features?: string[];
+  trained_at?: string;
+  brier?: number;
+  raw_brier?: number;
+  clim_brier?: number;
+  n_train?: number;
+  n_test?: number;
+};
 
 function loadRows(): Row[] | null {
   try {
     const raw = fs.readFileSync(LOG_PATH, "utf8");
     const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    if (lines.length < 2) return []; // header only / empty → no data yet (not an error)
+    if (lines.length < 2) return [];
     const header = lines[0].split(",").map((h) => h.trim());
     return lines.slice(1).map((line) => {
       const cells = line.split(",");
@@ -39,31 +42,51 @@ function loadRows(): Row[] | null {
       return o;
     });
   } catch {
-    return null; // read failed → calm error state
+    return null;
+  }
+}
+
+function loadModel(): Model | null {
+  try {
+    return JSON.parse(fs.readFileSync(MODEL_PATH, "utf8")) as Model;
+  } catch {
+    return null;
   }
 }
 
 const rows = loadRows();
 const readOk = rows !== null;
 const data: Row[] = rows ?? [];
+const model = loadModel();
 
 const num = (v: string): number => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
-// A row is "labelled" exactly as train.py's matured(): observed_raining non-blank.
 const isLabelled = (r: Row) => String(r.observed_raining ?? "").trim() !== "";
 
-// --- collection volume --------------------------------------------------------
-const totalRows = data.length; // one snapshot row per forecast-hour (log_snapshot.py)
-const runs = new Set(data.map((r) => r.issued_at)).size; // hourly cron runs
+const totalRows = data.length;
+const runs = new Set(data.map((r) => r.issued_at)).size;
 const labelled = data.filter(isLabelled);
 const nLab = labelled.length;
 const rainHours = labelled.filter((r) => num(r.observed_raining) === 1).length;
 const pending = totalRows - nLab;
 
-// --- the raw forecast's record on graded hours --------------------------------
-// "rain called" = fc_bestmatch_mm >= 0.3 (RAIN_TH). Honest 2×2 vs observed_raining.
+// issued_at is "YYYY-MM-DDTHH:00" UTC from the collector
+const lastIssued = data.reduce((m, r) => (r.issued_at > m ? r.issued_at : m), "");
+let hoursStale: number | null = null;
+if (lastIssued) {
+  const issuedMs = Date.parse(lastIssued.length === 16 ? `${lastIssued}:00Z` : lastIssued);
+  if (Number.isFinite(issuedMs)) hoursStale = (Date.now() - issuedMs) / 3_600_000;
+}
+const staleLevel =
+  hoursStale == null ? "unknown"
+  : hoursStale > STALE_FAIL_H ? "critical"
+  : hoursStale > STALE_WARN_H ? "warn"
+  : "ok";
+const lastIssuedLabel = lastIssued ? lastIssued.replace("T", " ") + " UTC" : null;
+
+// Raw forecast on ALL graded hours (product threshold ≥ 0.3 mm/h)
 let TP = 0, FP = 0, FN = 0, TN = 0;
 for (const r of labelled) {
   const calledRain = num(r.fc_bestmatch_mm) >= RAIN_TH;
@@ -78,41 +101,149 @@ const observedRain = TP + FN;
 
 const pctVal = (n: number, d: number) => (d ? (100 * n) / d : 0);
 const fmtPct = (n: number, d: number) => (d ? pctVal(n, d).toFixed(1) + "%" : "—");
+const fmtBrier = (v: number | null | undefined) =>
+  v == null || !Number.isFinite(v) ? "—" : v.toFixed(4);
+const fmtBss = (v: number | null | undefined) =>
+  v == null || !Number.isFinite(v) ? "—" : (v >= 0 ? "+" : "") + (100 * v).toFixed(1) + "%";
 
-const baseRate = fmtPct(observedRain, nLab); // how often it actually rained
-const pod = fmtPct(TP, observedRain);        // detection: caught rain / all rain
-const far = fmtPct(FP, rainCalls);           // false-alarm ratio: wrong calls / all calls
-const accuracy = fmtPct(TP + TN, nLab);      // raw agreement with observation
+const baseRate = fmtPct(observedRain, nLab);
+const pod = fmtPct(TP, observedRain);
+const far = fmtPct(FP, rainCalls);
+const accuracy = fmtPct(TP + TN, nLab);
 
-// --- progress to "model live" -------------------------------------------------
-const live = nLab >= MIN_ROWS;
+// Holdout = train.py: sort by valid_at, 80/20, Brier vs raw + clim
+function sigmoid(z: number) {
+  const c = Math.max(-60, Math.min(60, z));
+  return 1 / (1 + Math.exp(-c));
+}
+function rowFeatures(r: Row): number[] {
+  const bm = num(r.fc_bestmatch_mm);
+  const ecRaw = String(r.fc_ecmwf_mm ?? "").trim();
+  const ec = ecRaw === "" ? bm : num(r.fc_ecmwf_mm);
+  const hour = num(r.hour);
+  return [
+    bm, ec,
+    Math.sin((2 * Math.PI * hour) / 24),
+    Math.cos((2 * Math.PI * hour) / 24),
+    num(r.recent_rain_mm),
+  ];
+}
+function predictProba(m: Model, feats: number[]) {
+  const z = (m.intercept ?? 0) + (m.weights ?? []).reduce((s, w, i) => s + w * (feats[i] ?? 0), 0);
+  return sigmoid(z);
+}
+function brierScore(probs: number[], actual: number[]) {
+  if (!probs.length) return null;
+  let s = 0;
+  for (let i = 0; i < probs.length; i++) s += (probs[i] - actual[i]) ** 2;
+  return s / probs.length;
+}
+
+const enoughData = nLab >= MIN_ROWS;
+const isLogistic = !!model && model.type === "logistic" && Array.isArray(model.weights);
+
+type Holdout = {
+  nTrain: number; nTest: number;
+  modelBrier: number | null; rawBrier: number | null; climBrier: number | null;
+  bssRaw: number | null; bssClim: number | null;
+  mTP: number; mFP: number; mFN: number; mTN: number;
+  beatsRaw: boolean; beatsClim: boolean; status: string;
+};
+
+let holdout: Holdout | null = null;
+if (enoughData) {
+  const sorted = [...labelled].sort((a, b) =>
+    a.valid_at < b.valid_at ? -1 : a.valid_at > b.valid_at ? 1 : 0,
+  );
+  const split = Math.floor(sorted.length * 0.8);
+  const trainRows = sorted.slice(0, split);
+  const testRows = sorted.slice(split);
+  const yte = testRows.map((r) => num(r.observed_raining));
+  if (new Set(yte).size >= 2 && testRows.length > 0) {
+    const base = trainRows.reduce((s, r) => s + num(r.observed_raining), 0) / trainRows.length;
+    const Xte = testRows.map(rowFeatures);
+    const rawB = brierScore(Xte.map((x) => (x[0] >= RAIN_TH ? 1 : 0)), yte)!;
+    const climB = brierScore(Xte.map(() => base), yte)!;
+    let modelB: number | null = null;
+    let mTP = 0, mFP = 0, mFN = 0, mTN = 0;
+    if (isLogistic) {
+      const probs = Xte.map((x) => predictProba(model!, x));
+      modelB = brierScore(probs, yte);
+      for (let i = 0; i < testRows.length; i++) {
+        const called = probs[i] >= RAIN_PROB;
+        const did = yte[i] === 1;
+        if (called && did) mTP++;
+        else if (called && !did) mFP++;
+        else if (!called && did) mFN++;
+        else mTN++;
+      }
+    }
+    const beatsRaw = modelB != null && modelB <= rawB;
+    const beatsClim = modelB != null && modelB <= climB;
+    holdout = {
+      nTrain: trainRows.length, nTest: testRows.length,
+      modelBrier: modelB, rawBrier: rawB, climBrier: climB,
+      bssRaw: modelB != null && rawB > 0 ? 1 - modelB / rawB : null,
+      bssClim: modelB != null && climB > 0 ? 1 - modelB / climB : null,
+      mTP, mFP, mFN, mTN, beatsRaw, beatsClim,
+      status: !isLogistic ? "raw-fallback" : beatsRaw && beatsClim ? "ok" : "degraded",
+    };
+  }
+}
+
+const live = enoughData && isLogistic;
 const pctToLive = Math.max(0, Math.min(100, Math.round((nLab / MIN_ROWS) * 100)));
 const remaining = Math.max(0, MIN_ROWS - nLab);
-
 const builtAt = new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
-
-// Freshness: the most recent forecast-hour that has actually been graded, so a
-// visitor sees how current the board is — not just when it was baked. valid_at is
-// an IST "YYYY-MM-DDTHH:00" string (Asia/Kolkata), so lexical max = chronological max.
 const lastGraded = labelled.reduce((m, r) => (r.valid_at > m ? r.valid_at : m), "");
 const dataThrough = lastGraded ? lastGraded.replace("T", " ") + " IST" : null;
+const trainedAt = model?.trained_at
+  ? model.trained_at.replace("T", " ").replace("Z", " UTC")
+  : null;
 
-const title = "पाऊस · Scoreboard — model vs. raw forecast";
+const title = "पाऊस · Scoreboard — Mumbai rain model vs raw forecast";
 const description =
-  "The honesty board: every Mumbai rain forecast we publish, graded against what the airport actually observed. See the raw forecast's hit-and-miss record — and watch the calibrated model have to beat it before it ships.";
+  "Honesty board for Mumbai rain: every logged forecast graded against METAR at VABB. Live Brier for the calibrated model vs raw Open-Meteo and climatology on a time-ordered holdout.";
 ---
 <Page title={title} description={description} canonicalPath="/scoreboard" active="scoreboard">
-  {/* Hero — the pitch for the page. */}
   <section class="sb-hero">
     <p class="sb-eyebrow">The honesty board</p>
     <h1 class="sb-title">Model vs.<em> raw forecast</em></h1>
     <p class="sb-lede">
       Every forecast we publish gets logged, then graded against what Mumbai's
-      airport actually observed — no cherry-picking. Once the calibrated model
-      is live, this page shows it beating the raw forecast on these same hours.
-      If it can't, it doesn't ship.
+      airport actually observed — no cherry-picking. The calibrated model only
+      ships when it beats <em>both</em> the raw forecast and climatology on a
+      time-ordered holdout. If it can't, it doesn't ship.
     </p>
   </section>
+
+  {/* Stale / collect health — never silent when the diary freezes */}
+  {readOk && totalRows > 0 && staleLevel !== "ok" && (
+    <section
+      class={`sb-banner sb-banner-${staleLevel}`}
+      role="status"
+      aria-live="polite"
+    >
+      <p class="sb-banner-h">
+        {staleLevel === "critical"
+          ? "Collection looks stale"
+          : staleLevel === "warn"
+            ? "Collection running late"
+            : "Collection status unknown"}
+      </p>
+      <p class="sb-banner-p">
+        {lastIssuedLabel
+          ? `Last snapshot issued ${lastIssuedLabel}`
+          : "No issued_at stamps in the log."}
+        {hoursStale != null && (
+          <> · ~{hoursStale.toFixed(1)} hours ago</>
+        )}
+        {staleLevel === "critical" && (
+          <> · Numbers below may not reflect the last day of weather.</>
+        )}
+      </p>
+    </section>
+  )}
 
   {!readOk && (
     <section class="sb-empty" role="status">
@@ -133,11 +264,18 @@ const description =
 
   {readOk && totalRows > 0 && (
     <>
-      {/* Progress to live — the gate, stated plainly. */}
       <section class="sb-card sb-progress" aria-labelledby="sb-progress-h">
         <div class="sb-progress-top">
           <p class="sb-klabel" id="sb-progress-h">
-            {live ? "Calibrated model — live" : "Progress to a live model"}
+            {live
+              ? holdout?.status === "ok"
+                ? "Calibrated model — beating baselines"
+                : holdout?.status === "degraded"
+                  ? "Calibrated model — under pressure"
+                  : "Calibrated model — live"
+              : enoughData
+                ? "Serving raw forecast (no logistic champion)"
+                : "Progress to a live model"}
           </p>
           <p class="sb-progress-count">
             <span class="sb-now">{nLab}</span><span class="sb-of"> / {MIN_ROWS}</span>
@@ -150,12 +288,80 @@ const description =
         </div>
         <p class="sb-progress-note">
           {live
-            ? "Enough graded data to trust a model. The board below now grades the calibrated model against the raw forecast on a holdout it never trained on."
-            : `${remaining} more labelled hours to go. The calibrated logistic model trains every day on GitHub Actions and only goes live at ${MIN_ROWS} graded rows — and only if it beats the raw forecast and the current champion.`}
+            ? `Logistic champion trained ${trainedAt ?? "—"}. Holdout recomputed at build on the latest diary (same 80/20 time split as train.py).`
+            : enoughData
+              ? "Enough graded data, but model.json is not a logistic champion — UI falls back to the raw Open-Meteo path."
+              : `${remaining} more labelled hours to go. The model trains daily on GitHub Actions and only goes live at ${MIN_ROWS} graded rows — and only if it beats raw + climatology + the current champion.`}
         </p>
       </section>
 
-      {/* Collected so far — the raw volume of evidence. */}
+      {/* Live model holdout — the missing piece that used to only claim this */}
+      {holdout && (
+        <section aria-labelledby="sb-model-h">
+          <h2 class="sb-h2" id="sb-model-h">Holdout skill · model vs baselines</h2>
+          <p class="sb-section-lede">
+            Time-ordered last 20% of graded hours
+            ({holdout.nTest.toLocaleString()} test · {holdout.nTrain.toLocaleString()} train).
+            Lower Brier is better. Raw rain call = forecast
+            <span class="sb-mono"> ≥&nbsp;{RAIN_TH}&nbsp;mm·h⁻¹</span>
+            (same as the Now page). Logistic rain call =
+            <span class="sb-mono"> p&nbsp;≥&nbsp;{RAIN_PROB}</span>.
+          </p>
+          <dl class="sb-stats sb-stats-brier">
+            <div class="sb-stat">
+              <dt>Model Brier</dt>
+              <dd class="sb-n">{fmtBrier(holdout.modelBrier)}</dd>
+              <p class="sb-stat-sub">{holdout.status === "ok" ? "live champion" : holdout.status}</p>
+            </div>
+            <div class="sb-stat">
+              <dt>Raw Brier</dt>
+              <dd class="sb-n">{fmtBrier(holdout.rawBrier)}</dd>
+              <p class="sb-stat-sub">hard ≥{RAIN_TH} mm call</p>
+            </div>
+            <div class="sb-stat">
+              <dt>Climatology</dt>
+              <dd class="sb-n">{fmtBrier(holdout.climBrier)}</dd>
+              <p class="sb-stat-sub">train base rate</p>
+            </div>
+            <div class="sb-stat">
+              <dt>Skill vs raw</dt>
+              <dd class="sb-n">{fmtBss(holdout.bssRaw)}</dd>
+              <p class="sb-stat-sub">Brier skill score</p>
+            </div>
+          </dl>
+          <ul class="sb-metrics">
+            <li class={holdout.beatsRaw ? "" : "sb-m-flag"}>
+              <span class="sb-m-k">Beats raw?</span>
+              <span class="sb-m-v">{holdout.beatsRaw ? "yes" : "no"}</span>
+              <span class="sb-m-d">required for promotion</span>
+            </li>
+            <li class={holdout.beatsClim ? "" : "sb-m-flag"}>
+              <span class="sb-m-k">Beats clim?</span>
+              <span class="sb-m-v">{holdout.beatsClim ? "yes" : "no"}</span>
+              <span class="sb-m-d">required for promotion</span>
+            </li>
+            <li>
+              <span class="sb-m-k">Skill vs clim</span>
+              <span class="sb-m-v">{fmtBss(holdout.bssClim)}</span>
+              <span class="sb-m-d">positive = better than always-guess base rate</span>
+            </li>
+            {model?.brier != null && (
+              <li>
+                <span class="sb-m-k">Stored at promote</span>
+                <span class="sb-m-v">{fmtBrier(model.brier)}</span>
+                <span class="sb-m-d">model.json snapshot from last promotion</span>
+              </li>
+            )}
+          </ul>
+          {isLogistic && (
+            <p class="sb-reading sb-reading-ok">
+              On the holdout, logistic p≥{RAIN_PROB}:
+              {" "}{holdout.mTP} hits · {holdout.mFP} false alarms · {holdout.mFN} misses · {holdout.mTN} correct dry.
+            </p>
+          )}
+        </section>
+      )}
+
       <section aria-labelledby="sb-collected-h">
         <h2 class="sb-h2" id="sb-collected-h">What we've collected</h2>
         <dl class="sb-stats">
@@ -182,12 +388,12 @@ const description =
         </dl>
       </section>
 
-      {/* The raw forecast's record — the core honesty table. */}
       <section aria-labelledby="sb-raw-h">
         <h2 class="sb-h2" id="sb-raw-h">The raw forecast's record</h2>
         <p class="sb-section-lede">
-          On the {nLab.toLocaleString()} graded hours, counting a <em>rain</em> call
-          whenever the raw forecast read <span class="sb-mono">≥&nbsp;{RAIN_TH}&nbsp;mm·h⁻¹</span>
+          On <em>all</em> {nLab.toLocaleString()} graded hours (not just the holdout),
+          counting a rain call whenever the raw forecast read
+          <span class="sb-mono"> ≥&nbsp;{RAIN_TH}&nbsp;mm·h⁻¹</span>
           — the same line the Now page draws.
         </p>
 
@@ -265,19 +471,19 @@ const description =
         )}
       </section>
 
-      {/* What "live" will show — the promotion gate, mirrored from train.py. */}
       <section aria-labelledby="sb-gate-h">
-        <h2 class="sb-h2" id="sb-gate-h">What goes live at {MIN_ROWS}</h2>
+        <h2 class="sb-h2" id="sb-gate-h">Promotion gate</h2>
         <p class="sb-section-lede">
-          When the board turns on, it adds the model's column: a
-          <span class="sb-mono"> Brier score</span> measured on a time-ordered
-          holdout the model never trained on. The model only ships when it beats
-          both baselines — and a worse model can never replace a better one.
+          Daily retrain on GitHub Actions. A candidate ships only when its holdout
+          Brier is strictly no worse than raw, climatology, <em>and</em> the current
+          champion. A worse model can never replace a better one; a champion that
+          loses to raw or clim is demoted to raw passthrough.
         </p>
         <ol class="sb-gate">
-          <li><span class="sb-gate-n">1</span> Beat the <strong>raw forecast</strong> on the holdout.</li>
-          <li><span class="sb-gate-n">2</span> Beat the current <strong>champion</strong> model.</li>
-          <li><span class="sb-gate-n">3</span> Otherwise — rejected. The champion stays.</li>
+          <li><span class="sb-gate-n">1</span> Beat the <strong>raw forecast</strong> (≥{RAIN_TH} mm hard call).</li>
+          <li><span class="sb-gate-n">2</span> Beat <strong>climatology</strong> (train-set base rate).</li>
+          <li><span class="sb-gate-n">3</span> Beat the current <strong>champion</strong> model.</li>
+          <li><span class="sb-gate-n">4</span> Otherwise — rejected. The champion stays (or demotes to raw).</li>
         </ol>
       </section>
     </>
@@ -287,17 +493,18 @@ const description =
     <p>
       Forecast: <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a>.
       Ground truth: NOAA METAR, station VABB (Mumbai airport).
+      Health: <a href="/metrics.json"><code>metrics.json</code></a>.
     </p>
     <p class="sb-built">Baked at build · {builtAt}</p>
     {dataThrough && <p class="sb-built">Data through {dataThrough}</p>}
+    {lastIssuedLabel && <p class="sb-built">Last collect · {lastIssuedLabel}
+      {hoursStale != null && <> · {hoursStale.toFixed(1)}h ago</>}
+    </p>}
+    {trainedAt && <p class="sb-built">Model trained · {trainedAt}</p>}
   </footer>
 </Page>
 
 <style>
-  /* Scoped to this page. Global tokens (paper/ink/radar) come from almanac.css;
-     the centered column + masthead + section nav come from Page.astro. */
-
-  /* ---- hero ---- */
   .sb-hero { display: flex; flex-direction: column; gap: var(--s-3); }
   .sb-eyebrow {
     font-family: "IBM Plex Mono", monospace; font-size: .62rem;
@@ -318,7 +525,21 @@ const description =
     max-width: 38rem;
   }
 
-  /* ---- shared section bits ---- */
+  .sb-banner {
+    border: 1px solid var(--rule); padding: var(--s-4);
+    display: flex; flex-direction: column; gap: 6px;
+    border-left-width: 3px;
+  }
+  .sb-banner-warn { border-left-color: var(--radar-now); background: var(--paper-2); }
+  .sb-banner-critical { border-left-color: var(--radar-flood); background: var(--paper-2); }
+  .sb-banner-unknown { border-left-color: var(--ink-soft); background: var(--paper-2); }
+  .sb-banner-h {
+    font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 1.15rem; color: var(--ink);
+  }
+  .sb-banner-p {
+    font-family: "IBM Plex Mono", monospace; font-size: .72rem; line-height: 1.55; color: var(--ink-soft);
+  }
+
   .sb-h2 {
     font-family: "Fraunces", Georgia, serif; font-weight: 600;
     font-size: clamp(1.3rem, 5vw, 1.7rem); line-height: 1.05;
@@ -338,7 +559,6 @@ const description =
     font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
   }
 
-  /* ---- progress to live ---- */
   .sb-card {
     background: var(--paper-2); border: 1px solid var(--rule);
     padding: var(--s-4);
@@ -368,7 +588,6 @@ const description =
     color: var(--ink-soft); letter-spacing: .01em;
   }
 
-  /* ---- collected stats grid ---- */
   .sb-stats {
     display: grid; grid-template-columns: repeat(2, 1fr);
     border-top: 1px solid var(--rule); border-left: 1px solid var(--rule);
@@ -384,7 +603,7 @@ const description =
   }
   .sb-n {
     font-family: "IBM Plex Mono", monospace; font-weight: 600;
-    font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1;
+    font-size: clamp(1.4rem, 6vw, 2.1rem); line-height: 1;
     color: var(--ink); font-variant-numeric: tabular-nums;
   }
   .sb-stat-sub {
@@ -392,7 +611,6 @@ const description =
     font-size: .9rem; color: var(--ink-soft);
   }
 
-  /* ---- confusion matrix ---- */
   .sb-matrix {
     width: 100%; border-collapse: collapse;
     margin-bottom: var(--s-4);
@@ -428,13 +646,11 @@ const description =
     font-family: "IBM Plex Mono", monospace; font-size: .58rem;
     letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft);
   }
-  /* radar data-ink: only the costly cells get lit — the false-alarm story */
   .sb-fa   .sb-cell-n { color: var(--radar-flood); }
   .sb-fa   .sb-cell-l { color: var(--radar-flood); }
   .sb-miss .sb-cell-n { color: var(--radar-now); }
   .sb-hit  .sb-cell-n { color: var(--radar-dry); }
 
-  /* ---- derived metrics ---- */
   .sb-metrics { list-style: none; display: flex; flex-direction: column; }
   .sb-metrics li {
     display: grid; grid-template-columns: 1fr auto; align-items: baseline;
@@ -464,8 +680,8 @@ const description =
     border-left: 3px solid var(--radar-flood); padding: 4px 0 4px var(--s-4);
     margin-top: var(--s-4); max-width: 38rem;
   }
+  .sb-reading-ok { border-left-color: var(--radar-rain); }
 
-  /* ---- promotion gate ---- */
   .sb-gate { list-style: none; display: flex; flex-direction: column; gap: 2px; }
   .sb-gate li {
     display: flex; align-items: baseline; gap: var(--s-3);
@@ -479,7 +695,6 @@ const description =
   }
   .sb-gate strong { font-weight: 600; }
 
-  /* ---- empty / error states ---- */
   .sb-empty {
     background: var(--paper-2); border: 1px solid var(--rule);
     border-left: 3px solid var(--ink-soft); padding: var(--s-4);
@@ -501,7 +716,6 @@ const description =
     font-size: .85em; color: var(--ink);
   }
 
-  /* ---- footer ---- */
   .sb-foot {
     margin-top: auto; padding-top: var(--s-4);
     border-top: 1px solid var(--rule);
@@ -518,7 +732,6 @@ const description =
     overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
   }
 
-  /* wider screens: stats go 4-across, type breathes a touch more */
   @media (min-width: 620px) {
     .sb-stats { grid-template-columns: repeat(4, 1fr); }
   }

@@ -29,10 +29,12 @@ jobs:
         run: uv run pytest -q
       - name: Train + eval gate
         run: uv run python -m pipeline.train
-      - name: Commit model if promoted
+      - name: Health report (metrics.json)
+        run: uv run python -m pipeline.health
+      - name: Commit model + metrics if changed
         run: |
           git config user.name "rain-bot"
           git config user.email "rain-bot@users.noreply.github.com"
-          git add public/model.json
-          git diff --cached --quiet || git commit -m "model: retrain promoted [skip ci]"
+          git add public/model.json public/metrics.json
+          git diff --cached --quiet || git commit -m "model: retrain / health metrics [skip ci]"
           git push

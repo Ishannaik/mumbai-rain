@@ -1,0 +1,39 @@
+# पाऊस · Mumbai Rain
+
+> Free hyperlocal Mumbai rain nowcast: will it rain at your exact spot in the next 0–2 hours?
+
+Site: https://rain.ishannaik.com
+Repo: https://github.com/Ishannaik/mumbai-rain
+License: MIT
+
+## What it is
+
+- One-question weather product for Mumbai monsoons: leave now or wait.
+- Calibrated logistic model bias-corrects Open-Meteo forecasts; serves as plain JSON arithmetic in the browser.
+- Independent ground truth: NOAA METAR present-weather (RA/DZ) at VABB (Mumbai airport) — not forecast-vs-forecast.
+- Public scoreboard: https://rain.ishannaik.com/scoreboard
+- Method / limits: https://rain.ishannaik.com/about
+- Live metrics JSON: https://rain.ishannaik.com/metrics.json
+- API: GET https://rain.ishannaik.com/api/nowcast?lat=19.06&lon=72.83&hours=2
+  also ?locality=bandra
+
+## Honest claims
+
+- Better-calibrated rain probability vs a hard raw mm threshold and climatology on a time-ordered holdout (when the logistic champion is live).
+- Not radar nowcasting; not city-wide ground truth (airport labels only).
+- Not a paid service; $0 stack (static host + free APIs + GitHub Actions).
+
+## Key pages
+
+- / — live nowcast (geolocation + 146 localities)
+- /week — week outlook
+- /air — air quality
+- /scoreboard — model vs raw honesty board
+- /about — method and non-claims
+- /{locality} — per-area pages (e.g. /bandra)
+
+## Data
+
+- Training diary: data/log.csv in the git repo (hourly collector)
+- Model weights: /model.json
+- Weather input: Open-Meteo (credit required)

@@ -31,6 +31,11 @@ const {
 
 const canonical = new URL(canonicalPath, Astro.site).href;
 
+// Social preview card — one on-brand 1200×630 card, reused across the locality
+// pages (each page still carries its own og:title/description).
+const ogImage = new URL("/og/og-card.png", Astro.site).href;
+const siteName = "पाऊस · Mumbai Rain";
+
 // Index of the pre-selected locality for the no-JS <select> (-1 on the home
 // page, where geolocation decides and the bare control shows the first option
 // until the client island resolves the user's spot).
@@ -46,18 +51,62 @@ const defaultIdx = defaultLocality
   <title>{title}</title>
   <meta name="description" content={description} />
   <link rel="canonical" href={canonical} />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
   <meta name="theme-color" content="#dde2dc" />
   <meta name="color-scheme" content="light only" />
   <meta name="darkreader-lock" />
+  <meta name="geo.region" content="IN-MH" />
+  <meta name="geo.placename" content="Mumbai" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
   <!-- Open Graph / social (helps the locality pages rank + share well) -->
   <meta property="og:type" content="website" />
+  <meta property="og:site_name" content={siteName} />
+  <meta property="og:locale" content="en_IN" />
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
   <meta property="og:url" content={canonical} />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content={ogImage} />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Mumbai rain nowcast — will it rain at your spot in the next 2 hours?" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content={title} />
+  <meta name="twitter:description" content={description} />
+  <meta name="twitter:image" content={ogImage} />
+
+  <!-- Structured data: WebSite + WebApplication. Locality pages inherit via layout. -->
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": new URL("/#website", Astro.site).href,
+        "name": "Mumbai Rain — next 2 hours",
+        "alternateName": ["पाऊस", "Paaus", siteName],
+        "url": new URL("/", Astro.site).href,
+        "description": "Hyperlocal Mumbai rain nowcast: will it rain at your exact spot in the next 2 hours, with a flood watch.",
+        "inLanguage": ["en", "mr"],
+        "publisher": {
+          "@type": "Person",
+          "name": "Ishan Naik",
+          "url": "https://ishannaik.com",
+        },
+      },
+      {
+        "@type": "WebApplication",
+        "name": "पाऊस · Mumbai Rain",
+        "url": new URL("/", Astro.site).href,
+        "applicationCategory": "WeatherApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript for live nowcast",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
+        "description": "Free Mumbai 0–2 hour rain nowcast with flood watch and public skill scoreboard.",
+      },
+    ],
+  })} />
 
   <!-- The Monsoon Almanac's four faces, one combined request:
        Fraunces (display verdict, incl. 600 for italic emphasis), Newsreader

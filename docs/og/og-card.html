@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>og-card</title>
+<style>
+  :root{
+    --paper:  #dde2dc;   /* wet newsprint */
+    --paper-2:#d3d9d2;
+    --ink:    #16221f;   /* storm ink */
+    --ink-soft:#4a5853;  /* wet stone */
+    --rule:   #a9b3ac;
+    --radar-dry: #5a8f86;
+    --radar-rain:#2f7db0; /* radar blue */
+    --gold:     #e8b25a;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ width:1200px; height:630px; overflow:hidden; }
+  body{
+    background:
+      radial-gradient(1400px 700px at 78% -20%, #e6eae4 0%, rgba(230,234,228,0) 55%),
+      linear-gradient(160deg, var(--paper) 0%, var(--paper-2) 100%);
+    color:var(--ink);
+    font-family:"Newsreader", Georgia, serif;
+    display:flex;
+  }
+
+  /* ---- left: the verdict column ---- */
+  .left{
+    position:relative; z-index:2;
+    width:56%;
+    padding:64px 0 56px 72px;
+    display:flex; flex-direction:column;
+  }
+  .mast{
+    display:flex; align-items:baseline; gap:16px;
+    font-family:"Tiro Devanagari Marathi", serif;
+    font-size:40px; letter-spacing:.02em; color:var(--ink);
+  }
+  .mast .dot{ font-family:"IBM Plex Mono", monospace; font-size:14px; letter-spacing:.34em;
+              color:var(--radar-rain); }
+  .mast .dot::before{ content:"● "; }
+
+  .eyebrow{
+    margin-top:64px;
+    font-family:"IBM Plex Mono", monospace; font-size:15px;
+    letter-spacing:.3em; text-transform:uppercase; color:var(--radar-rain);
+  }
+  h1{
+    margin-top:20px;
+    font-family:"Fraunces", Georgia, serif; font-weight:900;
+    font-variation-settings:"opsz" 144;
+    font-size:96px; line-height:.98; letter-spacing:-.02em; color:var(--ink);
+    text-wrap:balance;
+  }
+  h1 em{ font-style:italic; font-weight:600; color:var(--radar-rain); }
+  .sub{
+    margin-top:26px;
+    font-family:"Newsreader", Georgia, serif; font-style:italic;
+    font-size:27px; line-height:1.35; color:var(--ink-soft);
+    max-width:520px;
+  }
+  .foot{
+    margin-top:auto;
+    display:flex; align-items:center; gap:14px;
+    font-family:"IBM Plex Mono", monospace; font-size:14px;
+    letter-spacing:.22em; text-transform:uppercase; color:var(--ink-soft);
+  }
+  .foot .blip{ width:10px; height:10px; border-radius:50%;
+               background:var(--radar-rain); box-shadow:0 0 0 4px rgba(47,125,176,.18); }
+
+  /* ---- right: the radar face ---- */
+  .right{
+    width:44%; position:relative;
+    display:grid; place-items:center;
+  }
+  .radar{
+    position:relative;
+    width:388px; height:388px; border-radius:50%;
+    background:var(--ink);
+    box-shadow:0 30px 60px rgba(22,34,31,.22), inset 0 0 0 2px rgba(221,226,220,.14);
+  }
+  /* faint sweep rings */
+  .radar::before, .radar::after{
+    content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    border:1px solid rgba(221,226,220,.10); border-radius:50%;
+  }
+  .radar::before{ width:250px; height:250px; }
+  .radar::after { width:120px; height:120px; }
+
+  .drop{ position:absolute; left:50%; top:28%; transform:translateX(-50%); }
+  .drop svg{ display:block; }
+  .ripples{ position:absolute; left:50%; bottom:22%; transform:translateX(-50%); width:230px; }
+
+  .tag{
+    position:absolute; left:50%; bottom:9%; transform:translateX(-50%);
+    font-family:"IBM Plex Mono", monospace; font-size:12px;
+    letter-spacing:.28em; text-transform:uppercase; color:rgba(221,226,220,.78);
+    white-space:nowrap;
+  }
+  .tag b{ color:var(--radar-rain); font-weight:600; }
+
+  /* bottom waterline rule */
+  .waterline{
+    position:absolute; left:0; right:0; bottom:0; height:10px;
+    background:var(--radar-rain);
+  }
+  .waterline::after{
+    content:""; position:absolute; left:0; bottom:10px; height:3px; right:0;
+    background:rgba(47,125,176,.35);
+  }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="mast">पाऊस <span class="dot">RAIN</span></div>
+    <div class="eyebrow">Mumbai · Monsoon nowcast</div>
+    <h1>Will it rain<br>in Mumbai<em>?</em></h1>
+    <p class="sub">A two-second verdict for your exact spot — rain, flood watch, and the next few hours.</p>
+    <div class="foot"><span class="blip"></span>next 2 hours · calibrated from open data</div>
+  </div>
+
+  <div class="right">
+    <div class="radar">
+      <div class="drop">
+        <svg width="120" height="160" viewBox="0 0 256 300" fill="none">
+          <path d="M128 40 C160 116 220 150 220 200 A92 92 0 1 1 36 200 C36 150 96 116 128 40 Z" fill="#dde2dc"/>
+        </svg>
+      </div>
+      <div class="ripples">
+        <svg width="230" height="60" viewBox="0 0 460 120" fill="none">
+          <path d="M0 30 q46 -24 92 0 t92 0 t92 0 t92 0 t92 0" stroke="#dde2dc" stroke-width="14" stroke-linecap="round"/>
+          <path d="M0 62 q40 -20 80 0 t80 0 t80 0 t80 0 t80 0" stroke="#dde2dc" stroke-width="14" stroke-linecap="round" opacity="0.75"/>
+          <path d="M0 94 q46 -24 92 0 t92 0 t92 0 t92 0 t92 0" stroke="#2f7db0" stroke-width="13" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="tag">0–2&nbsp;h&nbsp;·&nbsp;<b>2&nbsp;mm·h⁻¹</b>&nbsp;peak</div>
+    </div>
+  </div>
+
+  <div class="waterline"></div>
+</body>
+</html>

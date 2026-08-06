@@ -12,10 +12,17 @@ node_modules/
 dist/
 .astro/
 
-# OS / editor
+# local tooling / deploys
+.vercel
+.fallow/
+.superpowers/
+
+# crash dumps / OS junk
+*.stackdump
 .DS_Store
 Thumbs.db
+Desktop.ini
+*.swp
+*~
 
-# NOTE: data/log.csv is NOT ignored — it's the training database, committed by the cron.
-
-.vercel
+# NOTE: data/log.csv is NOT ignored — it's the training diary, committed by the hourly cron.

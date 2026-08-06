@@ -34,6 +34,9 @@ def test_gate_requires_beating_raw_and_champion():
     assert passes_gate(0.22, champ_brier=0.20, raw_brier=0.25) is False   # worse than champion
     assert passes_gate(0.30, champ_brier=0.20, raw_brier=0.25) is False   # worse than raw
     assert passes_gate(0.10, champ_brier=None, raw_brier=0.25) is True    # no champion yet
+    # clim is a third bar when provided
+    assert passes_gate(0.18, champ_brier=0.20, raw_brier=0.25, clim_brier=0.15) is False
+    assert passes_gate(0.10, champ_brier=0.20, raw_brier=0.25, clim_brier=0.15) is True
 
 
 def test_train_classifier_learns_separable_signal():
@@ -68,6 +71,11 @@ def test_no_demote_when_no_logistic_champion():
 def test_no_demote_on_tie():
     # tie keeps the champion, mirroring passes_gate's strict '>'
     assert should_demote(0.1724, 0.1724) is False
+
+
+def test_demote_when_champion_worse_than_clim():
+    assert should_demote(0.22, raw_b=0.30, clim_b=0.18) is True
+    assert should_demote(0.15, raw_b=0.30, clim_b=0.18) is False
 
 
 def test_passthrough_serves_raw_and_is_ignored_as_champion():
