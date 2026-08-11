@@ -121,6 +121,7 @@ const defaultIdx = defaultLocality
 
 </head>
 <body>
+  <a class="skip-link" href="#app">Skip to content</a>
   <!-- THE RISING WATER — the signature. Visible WITHOUT JS (calm base line);
        JS only raises/tints it. -->
   <div id="water" class="water" role="img" aria-label="Calm — no flooding"></div>
@@ -134,7 +135,7 @@ const defaultIdx = defaultLocality
        pointer-events:none, behind #app. -->
   <div id="rain-canvas" class="rain-layer" aria-hidden="true"></div>
 
-  <main id="app" class="state-loading" data-default-locality={defaultLocality ?? ""}>
+  <main id="app" class="state-loading" tabindex="-1" data-default-locality={defaultLocality ?? ""}>
     <!-- Masthead: the Marathi anchor (identity, constant ink) + the picker. -->
     <header class="masthead">
       <span class="anchor" lang="mr">पाऊस</span>

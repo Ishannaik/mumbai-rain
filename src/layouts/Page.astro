@@ -125,7 +125,8 @@ const NAV = [
   />
 </head>
 <body>
-  <main id={col.id} class={col.cls}>
+  <a class="skip-link" href={`#${col.id ?? "content"}`}>Skip to content</a>
+  <main id={col.id ?? "content"} class={col.cls} tabindex="-1">
     <!-- Masthead: the Marathi anchor (constant ink identity) + section nav. -->
     <header class="masthead">
       <span class="anchor" lang="mr">पाऊस</span>
