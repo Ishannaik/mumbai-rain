@@ -1,0 +1,125 @@
+name: staleness-alert
+
+# The push side of freshness. `collect` runs hourly and the scoreboard shows a
+# stale banner, but nobody is watching the scoreboard at 3am — and a cron can
+# "succeed" while quietly logging nothing, which is how the mid-monsoon diary gap
+# went unnoticed for weeks.
+#
+# This runs the same health gate the CLI exposes and, when the diary goes stale,
+# opens a GitHub issue (and optionally pings Discord). It closes the issue again
+# once collection recovers, so a green repo means a fresh diary.
+on:
+  schedule:
+    - cron: "40 */6 * * *"   # every 6h, offset off the :05 collector
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: staleness-alert
+  cancel-in-progress: false
+
+env:
+  STALE_HOURS: "6"
+  ISSUE_LABEL: stale-diary
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install deps
+        run: uv sync --frozen
+
+      # continue-on-error: a non-zero exit here is the SIGNAL, not a broken job.
+      - name: Check diary freshness
+        id: health
+        continue-on-error: true
+        run: |
+          set +e
+          uv run python -m pipeline.health --fail-stale "$STALE_HOURS" > health.txt 2>&1
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          cat health.txt
+          {
+            echo 'report<<HEALTH_EOF'
+            tail -c 3000 health.txt
+            echo HEALTH_EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the staleness issue
+        if: steps.health.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT: ${{ steps.health.outputs.report }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          existing=$(gh issue list --state open --label "$ISSUE_LABEL" \
+            --json number --jq '.[0].number // empty')
+
+          body=$(printf '%s\n' \
+            "\`pipeline.health --fail-stale $STALE_HOURS\` failed: the diary has no fresh row." \
+            "" \
+            "Most likely the hourly \`collect\` workflow is failing, or is succeeding while writing nothing." \
+            "" \
+            "**Health report**" \
+            '```' \
+            "$REPORT" \
+            '```' \
+            "" \
+            "Run: $RUN_URL" \
+            "" \
+            "_This issue is opened and closed automatically by \`staleness-alert\`._")
+
+          if [ -n "$existing" ]; then
+            # Already reported. Comment rather than opening a duplicate every 6h.
+            gh issue comment "$existing" --body "Still stale as of $(date -u +'%Y-%m-%dT%H:%MZ').
+
+          Run: $RUN_URL"
+          else
+            gh label create "$ISSUE_LABEL" --color B60205 \
+              --description "Diary collection has gone stale" 2>/dev/null || true
+            gh issue create \
+              --title "Diary is stale: no fresh row in ${STALE_HOURS}h" \
+              --label "$ISSUE_LABEL" \
+              --body "$body"
+          fi
+
+      - name: Notify Discord
+        # Optional: only fires when the webhook secret is configured.
+        if: steps.health.outputs.exit_code != '0' && env.DISCORD_WEBHOOK != ''
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n --arg content "🌧️ **mumbai-rain**: diary is stale (no fresh row in ${STALE_HOURS}h). $RUN_URL" \
+            '{content: $content}' \
+          | curl -sS -X POST -H "Content-Type: application/json" -d @- "$DISCORD_WEBHOOK"
+
+      - name: Close the staleness issue once collection recovers
+        if: steps.health.outputs.exit_code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing=$(gh issue list --state open --label "$ISSUE_LABEL" \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" \
+              --comment "Collection recovered: the diary is fresh within ${STALE_HOURS}h again."
+          fi
+
+      # Surface the failure on the workflow itself too, so a red run in the
+      # Actions tab means the same thing as an open issue.
+      - name: Fail the run when stale
+        if: steps.health.outputs.exit_code != '0'
+        run: |
+          echo "::error::Diary is stale — no fresh row in ${STALE_HOURS}h"
+          exit 1
