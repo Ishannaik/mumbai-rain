@@ -1,20 +1,20 @@
 {
-  "generated_at": "2026-08-14T20:39:26Z",
+  "generated_at": "2026-08-14T21:35:21Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
-    "n_rows": 7032,
-    "n_labelled": 6982,
-    "n_pending": 50,
+    "n_rows": 7056,
+    "n_labelled": 6985,
+    "n_pending": 71,
     "n_rain": 2648,
-    "base_rate": 0.3793,
-    "n_runs": 293,
+    "base_rate": 0.3791,
+    "n_runs": 294,
     "first_issued": "2026-06-25T15:00",
-    "last_issued": "2026-08-14T20:00",
-    "hours_since_last_issue": 0.66,
+    "last_issued": "2026-08-14T21:00",
+    "hours_since_last_issue": 0.59,
     "stale_level": "ok",
     "gap_count_gt_1h": 227,
     "max_gap_h": 511.0,
@@ -37,34 +37,34 @@
     ]
   },
   "eval": {
-    "n_labelled": 6982,
+    "n_labelled": 6985,
     "min_rows": 200,
     "ready": true,
     "holdout": {
-      "n_train": 5585,
+      "n_train": 5588,
       "n_test": 1397,
-      "base_rate_train": 0.3882,
+      "base_rate_train": 0.388,
       "rain_mm_threshold": 0.3,
       "brier": {
-        "model": 0.2239,
-        "raw": 0.4488,
+        "model": 0.224,
+        "raw": 0.4495,
         "clim": 0.2275,
         "stored_model": 0.0761
       },
       "bss": {
-        "model_vs_raw": 0.501,
-        "model_vs_clim": 0.0157
+        "model_vs_raw": 0.5016,
+        "model_vs_clim": 0.0152
       },
       "raw_contingency": {
         "tp": 370,
-        "fp": 517,
+        "fp": 518,
         "fn": 110,
-        "tn": 400,
+        "tn": 399,
         "pod": 0.7708,
-        "far": 0.5829,
-        "csi": 0.3711,
-        "bias": 1.8479,
-        "accuracy": 0.5512
+        "far": 0.5833,
+        "csi": 0.3707,
+        "bias": 1.85,
+        "accuracy": 0.5505
       },
       "model_contingency_p05": {
         "tp": 43,
@@ -85,13 +85,13 @@
   },
   "all_labelled_raw": {
     "tp": 2352,
-    "fp": 2003,
+    "fp": 2004,
     "fn": 296,
-    "tn": 2331,
+    "tn": 2333,
     "pod": 0.8882,
-    "far": 0.4599,
-    "csi": 0.5057,
-    "bias": 1.6446,
+    "far": 0.4601,
+    "csi": 0.5056,
+    "bias": 1.645,
     "accuracy": 0.6707
   },
   "thresholds": {
