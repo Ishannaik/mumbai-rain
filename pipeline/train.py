@@ -8,7 +8,7 @@ serves as plain arithmetic (sigmoid(w·x + b)) in the browser. Label is binary
 the goal is cutting false alarms.
 """
 import csv, json, math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sklearn.linear_model import LogisticRegression
 
 MODEL_PATH = "public/model.json"  # Astro serves this at /model.json (was web/model.json pre-Astro)
@@ -18,6 +18,98 @@ MIN_ROWS = 200  # ~8-9 days of labelled data before a model is trustworthy
 # of "raw rain call" (~noticeable drizzle). Labels remain METAR RA/DZ, not mm.
 RAIN_MM = 0.3
 FEATURE_NAMES = ["fc_bestmatch_mm", "fc_ecmwf_mm", "hour_sin", "hour_cos", "recent_rain_mm"]
+
+# Walk-forward validation. A single 80/20 split overstates skill: weather is autocorrelated
+# and one valid_at appears once per lead time (~7 rows), so a neighbouring hour on the other
+# side of the boundary is nearly the same observation.
+FOLDS = 4
+# Purge measured in HOURS, not rows. sklearn's TimeSeriesSplit(gap=n) gaps by row count,
+# which here is ~7 rows per hour and drifts whenever a lead time is added or a snapshot is
+# missed — so the gap is applied over valid_at instead.
+PURGE_HOURS = 6
+MIN_FOLD_ROWS = 25  # a fold smaller than this says nothing; skip it rather than score noise
+
+
+def _parse_valid_at(row):
+    """valid_at as a datetime. Logged as naive IST-local ISO, compared only against itself."""
+    return datetime.fromisoformat(row["valid_at"])
+
+
+def walk_forward_folds(rows, folds=FOLDS, purge_hours=PURGE_HOURS, min_fold_rows=MIN_FOLD_ROWS):
+    """Expanding-window folds over time, purged. Yields (train_rows, test_rows) oldest first.
+
+    Fold boundaries fall between DISTINCT valid_at values, never inside one, so the ~7 rows
+    sharing a timestamp cannot be split across train and test. Training is then truncated to
+    valid_at <= test_start - purge_hours, which is the leakage the purge exists to stop:
+    without it the last training hour sits minutes away from the first test hour.
+
+    Expanding rather than sliding: each fold trains on everything before it, which is how the
+    model will actually be fitted in production.
+    """
+    stamps = sorted({_parse_valid_at(r) for r in rows})
+    if len(stamps) < folds + 1:
+        return
+
+    # Equal-sized blocks of timestamps; the tail block absorbs any remainder.
+    block = len(stamps) // (folds + 1)
+    if block == 0:
+        return
+
+    for fold in range(1, folds + 1):
+        boundary = stamps[block * fold]
+        test_end = stamps[block * (fold + 1)] if fold < folds else None
+
+        train_cutoff = boundary - timedelta(hours=purge_hours)
+        train_rows = [r for r in rows if _parse_valid_at(r) <= train_cutoff]
+        test_rows = [
+            r
+            for r in rows
+            if _parse_valid_at(r) >= boundary and (test_end is None or _parse_valid_at(r) < test_end)
+        ]
+
+        if len(train_rows) < min_fold_rows or len(test_rows) < min_fold_rows:
+            continue
+        if len(set(int(float(r["observed_raining"])) for r in train_rows)) < 2:
+            continue
+        if len(set(int(float(r["observed_raining"])) for r in test_rows)) < 2:
+            continue
+        yield train_rows, test_rows
+
+
+def brier_skill_score(cand_brier, ref_brier):
+    """1 - cand/ref. Positive means better than the reference; 0 means no better.
+
+    A reference Brier of 0 means the baseline was perfect on that fold, so there is no skill
+    left to add: report 0.0 rather than dividing by zero.
+    """
+    if ref_brier == 0:
+        return 0.0
+    return 1.0 - (cand_brier / ref_brier)
+
+
+def median(values):
+    """Median without importing statistics for one call; empty -> None."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def passes_walk_forward(fold_skills):
+    """Median BSS vs raw > 0 across folds, and a win in at least 2 of them.
+
+    Both conditions, not either: a median above zero carried by one huge fold is the "lucky
+    monsoon week" the issue asks to exclude, and two wins out of three with a negative median
+    means the losses were worse than the wins.
+    """
+    if len(fold_skills) < 2:
+        return False
+    med = median(fold_skills)
+    wins = sum(1 for s in fold_skills if s > 0)
+    return med is not None and med > 0 and wins >= 2
 
 
 def _f(v, default=0.0):
@@ -149,18 +241,47 @@ def main():
     champ = _load_champion()
     champ_b = brier([predict_proba(champ, x) for x in Xte], yte) if champ else None
 
+    # Walk-forward folds, scored against the raw forecast on each fold's own holdout.
+    fold_skills = []
+    for fold_train, fold_test in walk_forward_folds(rows):
+        Xf_tr, yf_tr = build_xy(fold_train)
+        Xf_te, yf_te = build_xy(fold_test)
+        fold_model = train_classifier(Xf_tr, yf_tr)
+        fold_cand = brier([predict_proba(fold_model, x) for x in Xf_te], yf_te)
+        fold_raw = brier([1.0 if x[0] >= RAIN_MM else 0.0 for x in Xf_te], yf_te)
+        skill = brier_skill_score(fold_cand, fold_raw)
+        fold_skills.append(skill)
+        print(f"  fold {len(fold_skills)}: n_train={len(fold_train)} n_test={len(fold_test)} "
+              f"Brier={fold_cand:.4f} raw={fold_raw:.4f} BSS={skill:+.4f}")
+
+    fold_median = median(fold_skills)
+    walk_forward_ok = passes_walk_forward(fold_skills)
+
     candidate.update({
         "trained_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "n_train": len(train_rows), "n_test": len(test_rows),
         "brier": round(cand_b, 4), "raw_brier": round(raw_b, 4),
         "clim_brier": round(clim_b, 4),
         "champion_brier": round(champ_b, 4) if champ_b is not None else None,
+        "cv_folds": len(fold_skills),
+        "cv_purge_hours": PURGE_HOURS,
+        "cv_bss_vs_raw": [round(s, 4) for s in fold_skills],
+        "cv_bss_median": round(fold_median, 4) if fold_median is not None else None,
     })
     print(f"candidate Brier={cand_b:.4f}  raw-forecast={raw_b:.4f}  "
           f"climatology={clim_b:.4f}  champion={champ_b}  "
           f"(raw rain ≥ {RAIN_MM} mm/h)")
+    if fold_skills:
+        print(f"walk-forward: {len(fold_skills)} fold(s), median BSS vs raw "
+              f"{fold_median:+.4f}, wins {sum(1 for s in fold_skills if s > 0)}/{len(fold_skills)} "
+              f"-> {'PASS' if walk_forward_ok else 'FAIL'}")
+    else:
+        print(f"walk-forward: no usable folds (need {PURGE_HOURS}h purge + variety in each) "
+              "-> cannot promote on a single split alone.")
 
-    if passes_gate(cand_b, champ_b, raw_b, clim_b):
+    if not walk_forward_ok:
+        print("Rejected — walk-forward validation did not hold up across folds. Champion kept.")
+    elif passes_gate(cand_b, champ_b, raw_b, clim_b):
         with open(MODEL_PATH, "w") as f:
             json.dump(candidate, f, indent=2)
         print("PROMOTED — beats raw forecast, climatology, AND champion.")

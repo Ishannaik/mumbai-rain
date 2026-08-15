@@ -1,7 +1,10 @@
 import math
+from datetime import datetime, timedelta
+
 from pipeline.train import (row_to_features, brier, sigmoid, predict_proba,
                             passes_gate, train_classifier, build_xy, matured, FEATURE_NAMES,
-                            should_demote, raw_passthrough_model)
+                            should_demote, raw_passthrough_model,
+                            walk_forward_folds, brier_skill_score, median, passes_walk_forward)
 
 
 def test_row_to_features_shape_and_cyclic_hour():
@@ -94,3 +97,101 @@ def test_promotion_gate_unchanged():
     # regression guard: the existing gate still behaves
     assert passes_gate(0.10, 0.20, 0.15) is True     # beats champ & raw
     assert passes_gate(0.16, 0.20, 0.15) is False    # loses to raw
+
+
+# --- Walk-forward validation (issue #1) -------------------------------------
+
+
+def _rows(hours, leads=7, rain=lambda h: h % 2):
+    """One row per (valid_at hour, lead time), mimicking the log's ~7x duplication."""
+    base = datetime(2026, 7, 1, 0, 0)
+    out = []
+    for h in range(hours):
+        valid_at = base + timedelta(hours=h)
+        for lead in range(leads):
+            out.append({
+                "valid_at": valid_at.isoformat(timespec="minutes"),
+                "issued_at": (valid_at - timedelta(hours=lead)).isoformat(timespec="minutes"),
+                "fc_bestmatch_mm": "1.0" if rain(h) else "0.0",
+                "fc_ecmwf_mm": "1.0" if rain(h) else "0.0",
+                "hour": str(valid_at.hour),
+                "recent_rain_mm": "0.0",
+                "observed_raining": str(rain(h)),
+            })
+    return out
+
+
+def test_walk_forward_purge_leaves_no_training_row_inside_the_gap():
+    """The purge is the point: no training valid_at may sit within PURGE_HOURS of the test start."""
+    rows = _rows(200)
+    folds = list(walk_forward_folds(rows, folds=4, purge_hours=6))
+    assert folds, "fixture should produce usable folds"
+
+    for train_rows, test_rows in folds:
+        train_end = max(datetime.fromisoformat(r["valid_at"]) for r in train_rows)
+        test_start = min(datetime.fromisoformat(r["valid_at"]) for r in test_rows)
+        gap_hours = (test_start - train_end).total_seconds() / 3600
+        assert gap_hours >= 6, f"purge violated: only {gap_hours}h between train end and test start"
+
+
+def test_walk_forward_never_splits_one_valid_at_across_train_and_test():
+    """One valid_at is ~7 rows; if it straddles the boundary the holdout has seen its own hour."""
+    rows = _rows(200)
+    for train_rows, test_rows in walk_forward_folds(rows, folds=4, purge_hours=6):
+        train_stamps = {r["valid_at"] for r in train_rows}
+        test_stamps = {r["valid_at"] for r in test_rows}
+        assert not (train_stamps & test_stamps)
+
+
+def test_walk_forward_windows_expand_and_move_forward():
+    """Expanding window: each fold trains on at least as much as the previous one, later in time."""
+    rows = _rows(200)
+    folds = list(walk_forward_folds(rows, folds=4, purge_hours=6))
+    assert len(folds) >= 2
+    sizes = [len(train_rows) for train_rows, _ in folds]
+    starts = [min(datetime.fromisoformat(r["valid_at"]) for r in test_rows) for _, test_rows in folds]
+    assert sizes == sorted(sizes)
+    assert starts == sorted(starts) and len(set(starts)) == len(starts)
+
+
+def test_walk_forward_test_blocks_do_not_overlap():
+    rows = _rows(200)
+    seen = set()
+    for _, test_rows in walk_forward_folds(rows, folds=4, purge_hours=6):
+        stamps = {r["valid_at"] for r in test_rows}
+        assert not (stamps & seen), "fold test blocks must be disjoint"
+        seen |= stamps
+
+
+def test_walk_forward_yields_nothing_when_there_is_too_little_history():
+    assert list(walk_forward_folds(_rows(3), folds=4, purge_hours=6)) == []
+
+
+def test_walk_forward_skips_folds_with_only_one_class():
+    """A fold that never rains cannot score calibration, so it must be dropped, not scored."""
+    rows = _rows(200, rain=lambda h: 0)          # never rains anywhere
+    assert list(walk_forward_folds(rows, folds=4, purge_hours=6)) == []
+
+
+def test_brier_skill_score_signs():
+    assert brier_skill_score(0.10, 0.20) > 0      # better than reference
+    assert brier_skill_score(0.20, 0.20) == 0     # no better
+    assert brier_skill_score(0.30, 0.20) < 0      # worse
+    assert brier_skill_score(0.10, 0.0) == 0.0    # perfect reference -> no skill to add, no ZeroDivisionError
+
+
+def test_median_handles_even_and_odd_and_empty():
+    assert median([3, 1, 2]) == 2
+    assert median([4, 1, 2, 3]) == 2.5
+    assert median([]) is None
+
+
+def test_promotion_needs_median_above_zero_and_two_wins():
+    assert passes_walk_forward([0.1, 0.2, 0.3])          # consistent
+    assert passes_walk_forward([-0.01, 0.2, 0.3])        # one loss, median still positive
+    # The lucky-monsoon-week case the issue names: one huge win, everything else negative.
+    assert not passes_walk_forward([5.0, -0.1, -0.2])
+    # Two wins but the losses dominate, so the median is negative.
+    assert not passes_walk_forward([0.01, 0.02, -1.0, -1.0])
+    assert not passes_walk_forward([0.5])                # a single fold is not validation
+    assert not passes_walk_forward([])
