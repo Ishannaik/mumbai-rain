@@ -89,6 +89,13 @@ Returns JSON: calibrated rain probability, verdict text, flood-risk nearest zone
 - **No silent “AI magic”** — method, data split, and scoreboard are public
 - Product voice and method: site `/about`; early specs live under `archive/`
 
+## Contributing
+
+Setup, how to run the tests, and how `health` and `/scoreboard` fit together:
+[CONTRIBUTING.md](./CONTRIBUTING.md). Good places to start are the
+[good first issue](https://github.com/Ishannaik/mumbai-rain/labels/good%20first%20issue)
+and [docs](https://github.com/Ishannaik/mumbai-rain/labels/docs) labels.
+
 ## License
 
 [MIT](./LICENSE) · Weather data by [Open-Meteo](https://open-meteo.com/)
