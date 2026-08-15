@@ -35,6 +35,36 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { -webkit-text-size-adjust: 100%; background: var(--paper); }
 
+/* Skip link — keyboard-only path to main content (invisible until focused). */
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 100;
+  padding: 0.5rem 0.75rem;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+  text-decoration: none;
+  border: 2px solid var(--ink);
+  clip-path: inset(100%);
+  clip: rect(0 0 0 0);
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.skip-link:focus {
+  clip-path: none;
+  clip: auto;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  outline: 2px solid var(--radar-rain);
+  outline-offset: 2px;
+}
+
 body {
   min-height: 100svh;
   background: var(--paper);
