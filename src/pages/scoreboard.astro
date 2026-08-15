@@ -7,6 +7,7 @@
 // the log" page that a service worker can cache forever.
 import Page from "../layouts/Page.astro";
 import { loadLogCsv, loadModelJson } from "../lib/log-csv.js";
+import { reliabilityBins, contingencyScores } from "../lib/skill.js";
 
 // Must match pipeline/train.py RAIN_MM and nowcast.js RAIN_THRESHOLD_MM.
 const RAIN_TH = 0.3;
@@ -90,6 +91,11 @@ const fmtBrier = (v: number | null | undefined) =>
   v == null || !Number.isFinite(v) ? "—" : v.toFixed(4);
 const fmtBss = (v: number | null | undefined) =>
   v == null || !Number.isFinite(v) ? "—" : (v >= 0 ? "+" : "") + (100 * v).toFixed(1) + "%";
+// A rate in [0,1] as a percentage. Distinct from fmtPct, which takes n/d.
+const fmtRate = (v: number | null | undefined) =>
+  v == null || !Number.isFinite(v) ? "—" : (100 * v).toFixed(1) + "%";
+const fmtRatio = (v: number | null | undefined) =>
+  v == null || !Number.isFinite(v) ? "—" : v.toFixed(2);
 
 const baseRate = fmtPct(observedRain, nLab);
 const pod = fmtPct(TP, observedRain);
@@ -133,7 +139,13 @@ type Holdout = {
   bssRaw: number | null; bssClim: number | null;
   mTP: number; mFP: number; mFN: number; mTN: number;
   beatsRaw: boolean; beatsClim: boolean; status: string;
+  reliability: { lo: number; hi: number; n: number; forecast: number | null; observed: number | null }[];
+  pod: number | null; far: number | null; csi: number | null; bias: number | null;
 };
+
+// 5 bins, not 10: with a few hundred holdout rows a 10-bin table is mostly
+// empty cells, and an "observed" frequency over 3 samples is noise, not signal.
+const RELIABILITY_BINS = 5;
 
 let holdout: Holdout | null = null;
 if (enoughData) {
@@ -151,6 +163,7 @@ if (enoughData) {
     const climB = brierScore(Xte.map(() => base), yte)!;
     let modelB: number | null = null;
     let mTP = 0, mFP = 0, mFN = 0, mTN = 0;
+    let reliability: Holdout["reliability"] = [];
     if (isLogistic) {
       const probs = Xte.map((x) => predictProba(model!, x));
       modelB = brierScore(probs, yte);
@@ -162,7 +175,9 @@ if (enoughData) {
         else if (!called && did) mFN++;
         else mTN++;
       }
+      reliability = reliabilityBins(probs, yte, RELIABILITY_BINS);
     }
+    const scores = contingencyScores({ tp: mTP, fp: mFP, fn: mFN, tn: mTN });
     const beatsRaw = modelB != null && modelB <= rawB;
     const beatsClim = modelB != null && modelB <= climB;
     holdout = {
@@ -172,6 +187,8 @@ if (enoughData) {
       bssClim: modelB != null && climB > 0 ? 1 - modelB / climB : null,
       mTP, mFP, mFN, mTN, beatsRaw, beatsClim,
       status: !isLogistic ? "raw-fallback" : beatsRaw && beatsClim ? "ok" : "degraded",
+      reliability,
+      pod: scores.pod, far: scores.far, csi: scores.csi, bias: scores.bias,
     };
   }
 }
@@ -336,6 +353,69 @@ const description =
               On the holdout, logistic p≥{RAIN_PROB}:
               {" "}{holdout.mTP} hits · {holdout.mFP} false alarms · {holdout.mFN} misses · {holdout.mTN} correct dry.
             </p>
+          )}
+
+          {isLogistic && (
+            <>
+              <h3 class="sb-h3">At the decision threshold (p≥{RAIN_PROB})</h3>
+              <p class="sb-note">
+                What the numbers above mean if you actually act on them. CSI ignores the
+                many correct-dry hours, so unlike accuracy it can't be flattered by a
+                dry month.
+              </p>
+              <dl class="sb-stats">
+                <div class="sb-stat">
+                  <dt>POD</dt>
+                  <dd class="sb-n">{fmtRate(holdout.pod)}</dd>
+                  <p class="sb-stat-sub">of rainy hours we called</p>
+                </div>
+                <div class="sb-stat">
+                  <dt>FAR</dt>
+                  <dd class="sb-n">{fmtRate(holdout.far)}</dd>
+                  <p class="sb-stat-sub">of rain calls that were wrong</p>
+                </div>
+                <div class="sb-stat">
+                  <dt>CSI</dt>
+                  <dd class="sb-n">{fmtRate(holdout.csi)}</dd>
+                  <p class="sb-stat-sub">threat score, dry hours excluded</p>
+                </div>
+                <div class="sb-stat">
+                  <dt>Bias</dt>
+                  <dd class="sb-n">{fmtRatio(holdout.bias)}</dd>
+                  <p class="sb-stat-sub">1.00 = we call rain as often as it rains</p>
+                </div>
+              </dl>
+
+              <h3 class="sb-h3">Reliability — when we say X%, does it rain X%?</h3>
+              <p class="sb-note">
+                Brier alone hides miscalibration. A well-calibrated model has
+                <em>observed</em> close to <em>forecast</em> on every row; that is the
+                diagonal a reliability diagram draws. Rows with no holdout hours are
+                left blank rather than shown as zero.
+              </p>
+              <table class="sb-table sb-reliability">
+                <thead>
+                  <tr>
+                    <th scope="col">Forecast band</th>
+                    <th scope="col">Hours</th>
+                    <th scope="col">Mean forecast</th>
+                    <th scope="col">Observed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {holdout.reliability.map((b) => (
+                    <tr>
+                      <th scope="row">
+                        {Math.round(100 * b.lo)}–{Math.round(100 * b.hi)}%
+                      </th>
+                      <td>{b.n || "—"}</td>
+                      <td>{fmtRate(b.forecast)}</td>
+                      <td>{fmtRate(b.observed)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </section>
       )}
@@ -660,6 +740,34 @@ const description =
     margin-top: var(--s-4); max-width: 38rem;
   }
   .sb-reading-ok { border-left-color: var(--radar-rain); }
+
+  .sb-h3 {
+    font-family: "Fraunces", Georgia, serif; font-weight: 600;
+    font-size: clamp(1.02rem, 3.4vw, 1.16rem); line-height: 1.15;
+    color: var(--ink); letter-spacing: -.005em;
+    margin-top: var(--s-5); margin-bottom: var(--s-3);
+  }
+  .sb-note {
+    font-family: "IBM Plex Mono", monospace; font-size: .72rem; line-height: 1.55;
+    color: var(--ink-soft); margin-bottom: var(--s-3); max-width: 38rem;
+  }
+  .sb-note em { font-style: normal; color: var(--ink); }
+
+  .sb-table {
+    width: 100%; border-collapse: collapse;
+    font-family: "IBM Plex Mono", monospace; font-size: .74rem;
+    border-top: 1px solid var(--rule);
+  }
+  .sb-table th, .sb-table td {
+    padding: var(--s-3) var(--s-3); border-bottom: 1px solid var(--rule);
+    text-align: right; color: var(--ink);
+  }
+  .sb-table thead th {
+    font-size: .6rem; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink-soft); font-weight: 400;
+  }
+  .sb-table tbody th[scope="row"] { text-align: left; font-weight: 400; }
+  .sb-table th:first-child, .sb-table td:first-child { text-align: left; }
 
   .sb-gate { list-style: none; display: flex; flex-direction: column; gap: 2px; }
   .sb-gate li {
