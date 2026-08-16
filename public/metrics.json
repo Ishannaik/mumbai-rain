@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-08-16T02:37:09Z",
+  "generated_at": "2026-08-16T03:09:16Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
-    "n_rows": 7632,
-    "n_labelled": 7528,
-    "n_pending": 104,
-    "n_rain": 2893,
-    "base_rate": 0.3843,
-    "n_runs": 318,
+    "n_rows": 7656,
+    "n_labelled": 7543,
+    "n_pending": 113,
+    "n_rain": 2902,
+    "base_rate": 0.3847,
+    "n_runs": 319,
     "first_issued": "2026-06-25T15:00",
-    "last_issued": "2026-08-16T01:00",
-    "hours_since_last_issue": 1.62,
+    "last_issued": "2026-08-16T03:00",
+    "hours_since_last_issue": 0.15,
     "stale_level": "ok",
-    "gap_count_gt_1h": 231,
+    "gap_count_gt_1h": 232,
     "max_gap_h": 511.0,
-    "unique_valid": 751
+    "unique_valid": 752
   },
   "model": {
     "type": "logistic",
@@ -37,45 +37,45 @@
     ]
   },
   "eval": {
-    "n_labelled": 7528,
+    "n_labelled": 7543,
     "min_rows": 200,
     "ready": true,
     "holdout": {
-      "n_train": 6022,
-      "n_test": 1506,
-      "base_rate_train": 0.4017,
+      "n_train": 6034,
+      "n_test": 1509,
+      "base_rate_train": 0.4019,
       "rain_mm_threshold": 0.3,
       "brier": {
-        "model": 0.2098,
-        "raw": 0.496,
-        "clim": 0.2232,
+        "model": 0.2097,
+        "raw": 0.5017,
+        "clim": 0.2235,
         "stored_model": 0.2098
       },
       "bss": {
-        "model_vs_raw": 0.5771,
-        "model_vs_clim": 0.0604
+        "model_vs_raw": 0.582,
+        "model_vs_clim": 0.0618
       },
       "raw_contingency": {
-        "tp": 326,
-        "fp": 599,
-        "fn": 148,
-        "tn": 433,
-        "pod": 0.6878,
-        "far": 0.6476,
-        "csi": 0.3038,
-        "bias": 1.9515,
-        "accuracy": 0.504
+        "tp": 324,
+        "fp": 604,
+        "fn": 153,
+        "tn": 428,
+        "pod": 0.6792,
+        "far": 0.6509,
+        "csi": 0.2997,
+        "bias": 1.9455,
+        "accuracy": 0.4983
       },
       "model_contingency_p05": {
-        "tp": 57,
-        "fp": 15,
+        "tp": 60,
+        "fp": 17,
         "fn": 417,
-        "tn": 1017,
-        "pod": 0.1203,
-        "far": 0.2083,
-        "csi": 0.1166,
-        "bias": 0.1519,
-        "accuracy": 0.7131
+        "tn": 1015,
+        "pod": 0.1258,
+        "far": 0.2208,
+        "csi": 0.1215,
+        "bias": 0.1614,
+        "accuracy": 0.7124
       },
       "model_type": "logistic",
       "beats_raw": true,
@@ -84,15 +84,15 @@
     }
   },
   "all_labelled_raw": {
-    "tp": 2524,
-    "fp": 2158,
-    "fn": 369,
-    "tn": 2477,
-    "pod": 0.8725,
-    "far": 0.4609,
-    "csi": 0.4997,
-    "bias": 1.6184,
-    "accuracy": 0.6643
+    "tp": 2527,
+    "fp": 2163,
+    "fn": 375,
+    "tn": 2478,
+    "pod": 0.8708,
+    "far": 0.4612,
+    "csi": 0.4989,
+    "bias": 1.6161,
+    "accuracy": 0.6635
   },
   "thresholds": {
     "rain_mm": 0.3,
