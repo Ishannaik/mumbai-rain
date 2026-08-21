@@ -13,6 +13,7 @@ import { nearestZone, floodRisk } from "../../lib/flood.js";
 import { fetchWeather, shapeForecast } from "../../lib/open-meteo.js";
 import localities from "../../data/localities.json";
 import zones from "../../data/flood-zones.json";
+import * as Sentry from "@sentry/astro";
 
 export const prerender = false;
 
@@ -79,6 +80,7 @@ export async function GET({ request }) {
     model = await loadModel(request);
   } catch (err) {
     console.error("model load failed", err);
+    Sentry.captureException(err);
     return new Response(JSON.stringify({ error: "model_unavailable", detail: String(err) }), {
       status: 503,
       headers: { "Content-Type": "application/json" },
@@ -93,6 +95,7 @@ export async function GET({ request }) {
     fc = shapeForecast(data);
   } catch (err) {
     console.error("open-meteo fetch failed", err);
+    Sentry.captureException(err);
     return new Response(JSON.stringify({ error: "forecast_unavailable", detail: String(err) }), {
       status: 502,
       headers: { "Content-Type": "application/json" },
