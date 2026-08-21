@@ -40,7 +40,8 @@ def test_demote_when_worse_than_clim():
 
 
 def test_build_report_counts_and_holdout(tmp_path, monkeypatch):
-    # 220 labelled rows with a noisy mm signal (raw not perfect → BSS defined)
+    # 220 labelled FORWARD rows (valid hour >= issue hour in IST, per matured's
+    # serve-matching filter) with a noisy mm signal (raw not perfect → BSS defined)
     rows = []
     for i in range(220):
         rain = 1 if i % 2 == 0 else 0
@@ -49,8 +50,8 @@ def test_build_report_counts_and_holdout(tmp_path, monkeypatch):
             bm = 1.0 if i % 5 else 0.05
         else:
             bm = 0.0 if i % 5 else 0.5
-        day = 1 + (i // 24)
-        hour = i % 24
+        day = 1 + (i // 18)
+        hour = 6 + (i % 18)   # 06..23 IST, all >= 05:30 IST issue time -> forward
         valid = f"2026-07-{day:02d}T{hour:02d}:00"
         issued = f"2026-07-{day:02d}T00:00"
         rows.append(_row(valid, issued, bm, rain, recent=float(rain), hour=hour))

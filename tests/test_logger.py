@@ -27,11 +27,13 @@ def test_parse_metar_or_combines_within_hour():
 
 
 def test_append_snapshot_blank_label_and_none_ecmwf():
-    fc = {"valid_at": ["2026-06-25T20:00"], "fc_bestmatch_mm": [1.0], "fc_ecmwf_mm": [None]}
+    fc = {"valid_at": ["2026-06-25T20:00"], "fc_bestmatch_mm": [1.0],
+          "fc_ecmwf_mm": [None], "fc_rh_bestmatch": [88]}
     rows = append_snapshot([], fc, 19.12, 72.85, "2026-06-25T14:00", recent_rain_mm=0.5)
     r = rows[0]
     assert r["observed_raining"] == ""
     assert r["fc_ecmwf_mm"] == ""      # None benchmark -> blank, never 0
+    assert r["fc_rh_bestmatch"] == 88  # RH rides along as the accuracy feature
     assert r["hour"] == 20
     assert set(r.keys()) == set(LOG_HEADER)
 

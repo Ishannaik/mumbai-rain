@@ -78,7 +78,7 @@ Returns JSON: calibrated rain probability, verdict text, flood-risk nearest zone
 
 `public/model.json` is a few KB of weights:
 
-- Features: `fc_bestmatch_mm`, `fc_ecmwf_mm`, hour sin/cos, `recent_rain_mm`
+- Features: `fc_bestmatch_mm`, `fc_ecmwf_mm`, `fc_rh_bestmatch` (relative humidity), hour sin/cos, `recent_rain_mm`
 - Serve path: `sigmoid(w · x + b)` in the browser — no ML runtime on the live path
 - Promotion gate: walk-forward holdout; must beat current champion **and** raw forecast
 

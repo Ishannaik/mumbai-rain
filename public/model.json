@@ -3,11 +3,13 @@
   "features": [
     "fc_bestmatch_mm",
     "fc_ecmwf_mm",
+    "fc_rh_bestmatch",
     "hour_sin",
     "hour_cos",
     "recent_rain_mm"
   ],
   "weights": [
+<<<<<<< HEAD
     0.529791,
     0.708176,
     0.351268,
@@ -31,4 +33,21 @@
     0.5929
   ],
   "cv_bss_median": 0.6089
+=======
+    0.360412,
+    0.452372,
+    0.139386,
+    0.207377,
+    -0.280194,
+    0.056783
+  ],
+  "intercept": -13.507665,
+  "trained_at": "2026-08-11T03:57:33Z",
+  "n_train": 2115,
+  "n_test": 529,
+  "brier": 0.0603,
+  "raw_brier": 0.3214,
+  "clim_brier": 0.2053,
+  "champion_brier": 0.0722
+>>>>>>> 1a1ba1f (model: RH feature + forward-only training (Brier 0.0722 -> 0.0603))
 }

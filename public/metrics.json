@@ -1,11 +1,16 @@
 {
+<<<<<<< HEAD
   "generated_at": "2026-08-21T09:48:31Z",
+=======
+  "generated_at": "2026-08-11T04:01:23Z",
+>>>>>>> 1a1ba1f (model: RH feature + forward-only training (Brier 0.0722 -> 0.0603))
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
+<<<<<<< HEAD
     "n_rows": 10224,
     "n_labelled": 10120,
     "n_pending": 104,
@@ -15,9 +20,21 @@
     "first_issued": "2026-06-25T15:00",
     "last_issued": "2026-08-21T09:00",
     "hours_since_last_issue": 0.81,
+=======
+    "n_rows": 5808,
+    "n_labelled": 2644,
+    "n_pending": 3164,
+    "n_rain": 979,
+    "base_rate": 0.3703,
+    "n_runs": 242,
+    "first_issued": "2026-06-25T15:00",
+    "last_issued": "2026-08-11T02:00",
+    "hours_since_last_issue": 2.02,
+>>>>>>> 1a1ba1f (model: RH feature + forward-only training (Brier 0.0722 -> 0.0603))
     "stale_level": "ok",
     "gap_count_gt_1h": 250,
     "max_gap_h": 511.0,
+<<<<<<< HEAD
     "unique_valid": 879
   },
   "model": {
@@ -28,15 +45,29 @@
     "stored_clim_brier": 0.2068,
     "n_train": 6828,
     "n_test": 1708,
+=======
+    "unique_valid": 560
+  },
+  "model": {
+    "type": "logistic",
+    "trained_at": "2026-08-11T03:57:33Z",
+    "stored_brier": 0.0603,
+    "stored_raw_brier": 0.3214,
+    "stored_clim_brier": 0.2053,
+    "n_train": 2115,
+    "n_test": 529,
+>>>>>>> 1a1ba1f (model: RH feature + forward-only training (Brier 0.0722 -> 0.0603))
     "features": [
       "fc_bestmatch_mm",
       "fc_ecmwf_mm",
+      "fc_rh_bestmatch",
       "hour_sin",
       "hour_cos",
       "recent_rain_mm"
     ]
   },
   "eval": {
+<<<<<<< HEAD
     "n_labelled": 10120,
     "min_rows": 200,
     "ready": true,
@@ -76,6 +107,47 @@
         "csi": 0.0541,
         "bias": 0.1017,
         "accuracy": 0.9135
+=======
+    "n_labelled": 2644,
+    "min_rows": 200,
+    "ready": true,
+    "holdout": {
+      "n_train": 2115,
+      "n_test": 529,
+      "base_rate_train": 0.443,
+      "rain_mm_threshold": 0.3,
+      "brier": {
+        "model": 0.0603,
+        "raw": 0.3214,
+        "clim": 0.2053,
+        "stored_model": 0.0603
+      },
+      "bss": {
+        "model_vs_raw": 0.8124,
+        "model_vs_clim": 0.7063
+      },
+      "raw_contingency": {
+        "tp": 38,
+        "fp": 166,
+        "fn": 4,
+        "tn": 321,
+        "pod": 0.9048,
+        "far": 0.8137,
+        "csi": 0.1827,
+        "bias": 4.8571,
+        "accuracy": 0.6786
+      },
+      "model_contingency_p05": {
+        "tp": 16,
+        "fp": 6,
+        "fn": 26,
+        "tn": 481,
+        "pod": 0.381,
+        "far": 0.2727,
+        "csi": 0.3333,
+        "bias": 0.5238,
+        "accuracy": 0.9395
+>>>>>>> 1a1ba1f (model: RH feature + forward-only training (Brier 0.0722 -> 0.0603))
       },
       "model_type": "logistic",
       "beats_raw": true,
@@ -84,6 +156,7 @@
     }
   },
   "all_labelled_raw": {
+<<<<<<< HEAD
     "tp": 2675,
     "fp": 3253,
     "fn": 511,
@@ -93,6 +166,17 @@
     "csi": 0.4154,
     "bias": 1.8606,
     "accuracy": 0.6281
+=======
+    "tp": 881,
+    "fp": 696,
+    "fn": 98,
+    "tn": 969,
+    "pod": 0.8999,
+    "far": 0.4413,
+    "csi": 0.526,
+    "bias": 1.6108,
+    "accuracy": 0.6997
+>>>>>>> 1a1ba1f (model: RH feature + forward-only training (Brier 0.0722 -> 0.0603))
   },
   "thresholds": {
     "rain_mm": 0.3,

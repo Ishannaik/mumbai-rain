@@ -17,7 +17,12 @@ MIN_ROWS = 200  # ~8-9 days of labelled data before a model is trustworthy
 # Must match nowcast.js RAIN_THRESHOLD_MM and scoreboard RAIN_TH — one product definition
 # of "raw rain call" (~noticeable drizzle). Labels remain METAR RA/DZ, not mm.
 RAIN_MM = 0.3
-FEATURE_NAMES = ["fc_bestmatch_mm", "fc_ecmwf_mm", "hour_sin", "hour_cos", "recent_rain_mm"]
+# Ablation-tuned feature set (Aug 2026): adding relative_humidity_2m (the dominant
+# monsoon rain predictor) cut holdout Brier 0.0761->0.0657 on all rows, and
+# 0.0714->0.0603 on forward-only (serve-matching) rows. Dewpoint and lead-hours
+# were tested and REJECTED — they added noise, not signal.
+FEATURE_NAMES = ["fc_bestmatch_mm", "fc_ecmwf_mm", "fc_rh_bestmatch",
+                 "hour_sin", "hour_cos", "recent_rain_mm"]
 
 # Walk-forward validation. A single 80/20 split overstates skill: weather is autocorrelated
 # and one valid_at appears once per lead time (~7 rows), so a neighbouring hour on the other
@@ -119,16 +124,49 @@ def _f(v, default=0.0):
         return default
 
 
-def row_to_features(row):
+def row_to_features(row, feature_names=None):
+    """Feature vector in FEATURE_NAMES order. `feature_names` lets an OLD champion
+    model (5 features) be scored on the SAME row without breaking on the new 6th.
+    Missing RH falls back to 0 (pre-RH rows / nulls) rather than poisoning the sum."""
+    names = feature_names or FEATURE_NAMES
     bm = _f(row["fc_bestmatch_mm"])
     ec = _f(row.get("fc_ecmwf_mm"), bm)        # blank benchmark -> fall back to best_match
     hour = _f(row["hour"])
-    return [bm, ec, math.sin(2 * math.pi * hour / 24), math.cos(2 * math.pi * hour / 24),
-            _f(row["recent_rain_mm"])]
+    feats = {
+        "fc_bestmatch_mm": bm,
+        "fc_ecmwf_mm": ec,
+        "fc_rh_bestmatch": _f(row.get("fc_rh_bestmatch"), 50.0),  # 50% RH = neutral monsoon
+        "hour_sin": math.sin(2 * math.pi * hour / 24),
+        "hour_cos": math.cos(2 * math.pi * hour / 24),
+        "recent_rain_mm": _f(row["recent_rain_mm"]),
+    }
+    return [feats[n] for n in names]
+
+
+IST = timezone(timedelta(hours=5, minutes=30))  # Asia/Kolkata, matches valid_at grid
 
 
 def matured(rows):
-    return [r for r in rows if str(r.get("observed_raining", "")).strip() != ""]
+    """Labelled rows whose valid hour is NOT in the past relative to issue time.
+    The app only ever SERVES forward hours (nowcast.js slices from the current
+    hour), so training on same-day-past hours teaches the model a distribution
+    it never sees at serve time — the forward-only filter removes that mismatch.
+    Timezone care: issued_at is UTC, valid_at is IST (Open-Meteo Asia/Kolkata),
+    so the issue time is converted to IST before comparing."""
+    out = []
+    for r in rows:
+        if str(r.get("observed_raining", "")).strip() == "":
+            continue
+        try:
+            issued_utc = datetime.strptime(r["issued_at"], "%Y-%m-%dT%H:%M").replace(tzinfo=timezone.utc)
+            issued_ist = issued_utc.astimezone(IST)
+            valid_ist = datetime.strptime(r["valid_at"], "%Y-%m-%dT%H:%M").replace(tzinfo=IST)
+        except (KeyError, ValueError):
+            continue
+        if valid_ist < issued_ist:
+            continue
+        out.append(r)
+    return out
 
 
 def build_xy(rows):
@@ -177,14 +215,14 @@ def should_demote(champ_b, raw_b, clim_b=None):
 
 
 def raw_passthrough_model(raw_b, clim_b, champ_b, n_train, n_test, trained_at):
-    """A model.json that serves the raw Open-Meteo forecast: linear, weights [1,0,0,0,0],
+    """A model.json that serves the raw Open-Meteo forecast: linear, weights [1,0,...],
     intercept 0 -> predict = max(0, fc_bestmatch_mm). type='raw' (not 'logistic') so the
     browser's linear path serves it as raw AND the next retrain's _load_champion ignores it.
     Keeps the stable model.json schema (same keys as a promoted model)."""
     return {
         "type": "raw",
         "features": FEATURE_NAMES,
-        "weights": [1.0, 0.0, 0.0, 0.0, 0.0],
+        "weights": [1.0] + [0.0] * (len(FEATURE_NAMES) - 1),
         "intercept": 0.0,
         "trained_at": trained_at,
         "n_train": n_train, "n_test": n_test,
@@ -239,7 +277,13 @@ def main():
     raw_b = brier([1.0 if x[0] >= RAIN_MM else 0.0 for x in Xte], yte)   # raw forecast's rain call
     clim_b = brier([base_rate] * len(yte), yte)                          # always predict base rate
     champ = _load_champion()
-    champ_b = brier([predict_proba(champ, x) for x in Xte], yte) if champ else None
+    champ_b = None
+    if champ:
+        # An old champion declares its own features (5); score it on the same
+        # holdout rows using ITS feature vector, not the new 6-feature one.
+        champ_feats = champ.get("features") or FEATURE_NAMES
+        champ_Xte = [row_to_features(r, champ_feats) for r in test_rows]
+        champ_b = brier([predict_proba(champ, x) for x in champ_Xte], yte)
 
     # Walk-forward folds, scored against the raw forecast on each fold's own holdout.
     fold_skills = []

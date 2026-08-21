@@ -3,8 +3,9 @@
 // so this file is reused verbatim by the unit tests.
 //
 // Serving parity with pipeline/train.py:
-//   FEATURE_NAMES = ["fc_bestmatch_mm", "fc_ecmwf_mm", "hour_sin", "hour_cos", "recent_rain_mm"]
-//   row_to_features -> [bm, ec, sin(2πh/24), cos(2πh/24), recent_rain_mm]
+//   FEATURE_NAMES = ["fc_bestmatch_mm", "fc_ecmwf_mm", "fc_rh_bestmatch",
+//                    "hour_sin", "hour_cos", "recent_rain_mm"]
+//   row_to_features -> [bm, ec, rh, sin(2πh/24), cos(2πh/24), recent_rain_mm]
 //   predict_proba   -> sigmoid(intercept + Σ w·x)   (model "type": "logistic")
 // rowFeatures + predict below mirror that EXACT order and arithmetic.
 
@@ -13,12 +14,13 @@ const RAIN_PROB = 0.5;         // logistic-model rain cutoff (probability of rai
 const HORIZON_HRS = 2;         // default window; verdict() accepts an override.
 
 // Feature vector in the EXACT order pipeline/train.py FEATURE_NAMES expects:
-//   [fc_bestmatch_mm, fc_ecmwf_mm, hour_sin, hour_cos, recent_rain_mm]
-// (best_match first, then the ECMWF benchmark — matches row_to_features.)
-export function rowFeatures({ fc_bestmatch_mm, fc_ecmwf_mm, hour, recent_rain_mm }) {
+//   [fc_bestmatch_mm, fc_ecmwf_mm, fc_rh_bestmatch, hour_sin, hour_cos, recent_rain_mm]
+// (best_match first, then the ECMWF benchmark, then RH — matches row_to_features.)
+export function rowFeatures({ fc_bestmatch_mm, fc_ecmwf_mm, fc_rh_bestmatch, hour, recent_rain_mm }) {
   return [
     fc_bestmatch_mm,
     fc_ecmwf_mm,
+    fc_rh_bestmatch,
     Math.sin((2 * Math.PI * hour) / 24),
     Math.cos((2 * Math.PI * hour) / 24),
     recent_rain_mm,
@@ -74,6 +76,7 @@ export function verdict(model, forecast, nowHour, recentRain, horizonHrs = HORIZ
       rowFeatures({
         fc_bestmatch_mm: bm,
         fc_ecmwf_mm: forecast.fc_ecmwf_mm[i] ?? 0,
+        fc_rh_bestmatch: forecast.fc_rh_bestmatch?.[i] ?? 50,
         hour: (nowHour + i) % 24,
         recent_rain_mm: recentRain,
       })

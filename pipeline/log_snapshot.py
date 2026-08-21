@@ -13,7 +13,8 @@ from pipeline.sources import fetch_forecast, fetch_recent_rain_mm
 from pipeline.labels import fetch_metar
 
 LOG_HEADER = ["issued_at", "valid_at", "lat", "lon",
-              "fc_bestmatch_mm", "fc_ecmwf_mm", "hour", "recent_rain_mm", "observed_raining"]
+              "fc_bestmatch_mm", "fc_ecmwf_mm", "fc_rh_bestmatch",
+              "hour", "recent_rain_mm", "observed_raining"]
 LOG_PATH = "data/log.csv"
 MUMBAI = (19.12, 72.85)
 STATION = "VABB"  # Mumbai airport METAR
@@ -24,10 +25,12 @@ def append_snapshot(rows, forecast, lat, lon, issued_at, recent_rain_mm):
     new = []
     for i, vt in enumerate(forecast["valid_at"]):
         ec = forecast["fc_ecmwf_mm"][i]
+        rh = forecast["fc_rh_bestmatch"][i]
         new.append({
             "issued_at": issued_at, "valid_at": vt, "lat": lat, "lon": lon,
             "fc_bestmatch_mm": forecast["fc_bestmatch_mm"][i],
             "fc_ecmwf_mm": "" if ec is None else ec,   # missing benchmark stays blank, never 0
+            "fc_rh_bestmatch": "" if rh is None else rh,
             "hour": int(vt[11:13]),
             "recent_rain_mm": recent_rain_mm,
             "observed_raining": "",

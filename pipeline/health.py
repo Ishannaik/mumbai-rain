@@ -25,6 +25,7 @@ from pipeline.train import (
     build_xy,
     matured,
     predict_proba,
+    row_to_features,
 )
 
 METRICS_PATH = "public/metrics.json"
@@ -112,14 +113,18 @@ def _holdout_metrics(rows: list[dict], model: dict | None) -> dict:
     model_probs = None
     if model and model.get("type") == "logistic" and model.get("weights"):
         model_type = "logistic"
-        # Use live weights (same arithmetic as browser)
+        # Use live weights (same arithmetic as browser). Score with the model's
+        # OWN declared features so an old 5-feature champion still evaluates
+        # (row_to_features maps by feature name, not position).
+        m_feats = model.get("features") or FEATURE_NAMES
         m = {
             "type": "logistic",
             "weights": model["weights"],
             "intercept": model["intercept"],
-            "features": model.get("features", FEATURE_NAMES),
+            "features": m_feats,
         }
-        model_probs = [predict_proba(m, x) for x in Xte]
+        model_Xte = [row_to_features(r, m_feats) for r in test_rows]
+        model_probs = [predict_proba(m, x) for x in model_Xte]
         model_b = brier(model_probs, yte)
     elif model:
         model_type = model.get("type", "unknown")

@@ -1,6 +1,6 @@
 // Unit tests for the pure verdict logic. Run with `bun test`.
 //
-// The fixture uses a LINEAR pass-through model (weights [1,0,0,0,0], intercept 0)
+// The fixture uses a LINEAR pass-through model (weights [1,0,0,0,0,0], intercept 0)
 // so predict() returns the raw best_match mm — i.e. "raining when mm >= 0.3"
 // (RAIN_THRESHOLD_MM). That isolates the rain-BLOCK detection (start/end) we're
 // testing here from the model arithmetic, which has its own parity contract.
@@ -9,16 +9,18 @@ import { test, expect } from "bun:test";
 import { verdict, predict, rowFeatures } from "./nowcast.js";
 
 // Build a forecast object shaped like the live Open-Meteo parse: only the fields
-// verdict() reads. fc_ecmwf is zeroed (the linear model ignores it via weight 0).
+// verdict() reads. fc_ecmwf is zeroed (the linear model ignores it via weight 0);
+// RH defaults to 50 (the neutral monsoon value train.py also uses for missing RH).
 function fc(bm) {
   return {
     valid_at: bm.map((_, i) => i),
     fc_bestmatch_mm: bm,
     fc_ecmwf_mm: bm.map(() => 0),
+    fc_rh_bestmatch: bm.map(() => 50),
   };
 }
 
-const LINEAR = { weights: [1, 0, 0, 0, 0], intercept: 0 };
+const LINEAR = { weights: [1, 0, 0, 0, 0, 0], intercept: 0 };
 const NOW = 12; // arbitrary current hour; rain-block logic is hour-agnostic
 
 test("raining now, eases mid-window -> endsInHrs marks the first dry hour", () => {
@@ -66,7 +68,7 @@ test("threshold: 0.2mm is dry, >=0.3mm is rain", () => {
 
 test("logistic model gets the same start/end treatment", () => {
   // sigmoid(5*bm - 1): bm=1 -> 0.98 (rain, >=0.5); bm=0 -> 0.27 (dry)
-  const LOGISTIC = { type: "logistic", weights: [5, 0, 0, 0, 0], intercept: -1 };
+  const LOGISTIC = { type: "logistic", weights: [5, 0, 0, 0, 0, 0], intercept: -1 };
   const v = verdict(LOGISTIC, fc([1, 1, 0]), NOW, 0, 3);
   expect(v.startsInHrs).toBe(0);
   expect(v.endsInHrs).toBe(2);
@@ -75,5 +77,15 @@ test("logistic model gets the same start/end treatment", () => {
 
 // Sanity: the pure model arithmetic still matches the parity contract.
 test("predict() linear branch clamps negatives to 0", () => {
-  expect(predict(LINEAR, rowFeatures({ fc_bestmatch_mm: -5, fc_ecmwf_mm: 0, hour: 0, recent_rain_mm: 0 }))).toBe(0);
+  expect(predict(LINEAR, rowFeatures({ fc_bestmatch_mm: -5, fc_ecmwf_mm: 0, fc_rh_bestmatch: 50, hour: 0, recent_rain_mm: 0 }))).toBe(0);
+});
+
+// RH in the right slot: a model with RH weight 1 (and nothing else) must rise
+// monotonically with humidity — parity with train.py's row_to_features order.
+test("rowFeatures places RH third (fc_bestmatch, fc_ecmwf, fc_rh, hour, recent)", () => {
+  const f = rowFeatures({ fc_bestmatch_mm: 1, fc_ecmwf_mm: 2, fc_rh_bestmatch: 80, hour: 0, recent_rain_mm: 0.5 });
+  expect(f[0]).toBe(1);
+  expect(f[1]).toBe(2);
+  expect(f[2]).toBe(80);
+  expect(f[5]).toBe(0.5);
 });

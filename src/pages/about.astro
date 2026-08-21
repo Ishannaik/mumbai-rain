@@ -59,7 +59,9 @@ const description =
       and <code>ecmwf_ifs025</code>, ECMWF's flagship operational physics
       model, Europe's gold standard, kept as the benchmark we measure
       ourselves against. Alongside them rides the single strongest 0–2 hour
-      clue: how much rain actually fell in the last three hours.
+      clue: how much rain actually fell in the last three hours — plus
+      relative humidity, the dominant short-term monsoon signal (a warm,
+      saturated atmosphere is rain waiting to happen).
     </p>
     <p>
       The <b>answer key</b> is not forecast. It's <code>METAR</code> — the real
@@ -77,7 +79,7 @@ const description =
     <dl class="spec">
       <div><dt>forecast</dt><dd>Open-Meteo best_match</dd></div>
       <div><dt>benchmark</dt><dd>ECMWF-IFS · ecmwf_ifs025</dd></div>
-      <div><dt>top feature</dt><dd>rain, last 3&nbsp;h</dd></div>
+      <div><dt>top feature</dt><dd>relative humidity + rain, last 3&nbsp;h</dd></div>
       <div><dt>ground truth</dt><dd>METAR · VABB airport</dd></div>
       <div><dt>rain tokens</dt><dd>RA · DZ</dd></div>
       <div><dt>forecast vs label</dt><dd>independent</dd></div>
@@ -89,9 +91,10 @@ const description =
     <p class="method-kicker"><span class="n">03</span> The model</p>
     <h2>A few numbers, applied in <em>your browser</em></h2>
     <p>
-      The model is a calibrated logistic classifier. Five inputs — the two
-      forecasts, the hour of day (as sine and cosine), and the recent rain —
-      go in; one corrected probability of rain comes out. That's all of it.
+      The model is a calibrated logistic classifier. Six inputs — the two
+      forecasts, relative humidity, the hour of day (as sine and cosine), and
+      the recent rain — go in; one corrected probability of rain comes out.
+      That's all of it.
     </p>
     <p>
       It's trained offline and exported to <code>model.json</code>: a few

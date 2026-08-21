@@ -51,9 +51,18 @@ const num = (v: string): number => {
 };
 const isLabelled = (r: Row) => String(r.observed_raining ?? "").trim() !== "";
 
+// Same serve-matching filter as train.py matured(): a row only counts when its
+// valid hour is NOT in the past relative to issue time (issued_at is UTC,
+// valid_at is IST → issue time converted to IST before comparing).
+const isForward = (r: Row): boolean => {
+  const issued = Date.parse(`${r.issued_at}:00Z`);
+  const valid = Date.parse(`${r.valid_at}:00+05:30`);
+  return Number.isFinite(issued) && Number.isFinite(valid) && valid >= issued;
+};
+
 const totalRows = data.length;
 const runs = new Set(data.map((r) => r.issued_at)).size;
-const labelled = data.filter(isLabelled);
+const labelled = data.filter((r) => isLabelled(r) && isForward(r));
 const nLab = labelled.length;
 const rainHours = labelled.filter((r) => num(r.observed_raining) === 1).length;
 const pending = totalRows - nLab;
@@ -111,9 +120,11 @@ function rowFeatures(r: Row): number[] {
   const bm = num(r.fc_bestmatch_mm);
   const ecRaw = String(r.fc_ecmwf_mm ?? "").trim();
   const ec = ecRaw === "" ? bm : num(r.fc_ecmwf_mm);
+  const rhRaw = String(r.fc_rh_bestmatch ?? "").trim();
+  const rh = rhRaw === "" ? 50 : num(r.fc_rh_bestmatch); // 50 = neutral monsoon default
   const hour = num(r.hour);
   return [
-    bm, ec,
+    bm, ec, rh,
     Math.sin((2 * Math.PI * hour) / 24),
     Math.cos((2 * Math.PI * hour) / 24),
     num(r.recent_rain_mm),

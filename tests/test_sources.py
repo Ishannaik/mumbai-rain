@@ -2,21 +2,24 @@ from pipeline.sources import build_forecast_url, _ecmwf_url, parse_forecast
 
 
 def test_url_builders_target_the_two_models():
-    # best_match drives the app feed; ECMWF-IFS is fetched separately as the benchmark.
+    # best_match drives the app feed (now incl. RH); ECMWF-IFS is the benchmark.
     assert "best_match" in build_forecast_url(19.12, 72.85)
     assert "hourly=precipitation" in build_forecast_url(19.12, 72.85)
+    assert "relative_humidity_2m" in build_forecast_url(19.12, 72.85)
     assert "ecmwf_ifs025" in _ecmwf_url(19.12, 72.85)
 
 
 def test_parse_forecast_aligns_models_by_time():
     raw_best = {"hourly": {"time": ["2026-06-23T00:00", "2026-06-23T01:00"],
-                           "precipitation": [0.0, 2.5]}}
+                           "precipitation": [0.0, 2.5],
+                           "relative_humidity_2m": [81, 88]}}
     raw_ecmwf = {"hourly": {"time": ["2026-06-23T00:00", "2026-06-23T01:00"],
                             "precipitation": [0.1, 3.0]}}
     out = parse_forecast(raw_best, raw_ecmwf)
     assert out["valid_at"] == ["2026-06-23T00:00", "2026-06-23T01:00"]
     assert out["fc_bestmatch_mm"] == [0.0, 2.5]
     assert out["fc_ecmwf_mm"] == [0.1, 3.0]
+    assert out["fc_rh_bestmatch"] == [81, 88]
 
 
 def test_parse_forecast_missing_ecmwf_time_is_none_not_zero():
@@ -27,6 +30,7 @@ def test_parse_forecast_missing_ecmwf_time_is_none_not_zero():
     raw_ecmwf = {"hourly": {"time": ["2026-06-23T00:00"], "precipitation": [1.1]}}
     out = parse_forecast(raw_best, raw_ecmwf)
     assert out["fc_ecmwf_mm"] == [1.1, None]
+    assert out["fc_rh_bestmatch"] == [None, None]  # no RH key in payload -> neutral None
 
 
 def test_get_session_has_retry_and_backoff():

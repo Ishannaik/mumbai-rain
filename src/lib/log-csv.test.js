@@ -33,11 +33,12 @@ test("parseLogCsv: parses a labelled row", () => {
   const csv =
     LOG_HEADER.join(",") +
     "\n" +
-    "2026-08-01T00:00,2026-08-01T01:00,19.12,72.85,0.5,0.4,1,0.2,1\n";
+    "2026-08-01T00:00,2026-08-01T01:00,19.12,72.85,0.5,0.4,80,1,0.2,1\n";
   const rows = parseLogCsv(csv);
   expect(rows.length).toBe(1);
   expect(rows[0].observed_raining).toBe("1");
   expect(rows[0].fc_bestmatch_mm).toBe("0.5");
+  expect(rows[0].fc_rh_bestmatch).toBe("80");
 });
 
 test("parseLogCsv: strips BOM", () => {

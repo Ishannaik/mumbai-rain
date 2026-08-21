@@ -1,29 +1,50 @@
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from pipeline.train import (row_to_features, brier, sigmoid, predict_proba,
                             passes_gate, train_classifier, build_xy, matured, FEATURE_NAMES,
                             should_demote, raw_passthrough_model,
                             walk_forward_folds, brier_skill_score, median, passes_walk_forward)
 
+IST = timezone(timedelta(hours=5, minutes=30))
+
 
 def test_row_to_features_shape_and_cyclic_hour():
     f = row_to_features({"fc_bestmatch_mm": "2.0", "fc_ecmwf_mm": "1.5",
-                         "hour": "6", "recent_rain_mm": "0.5"})
+                         "fc_rh_bestmatch": "80", "hour": "6", "recent_rain_mm": "0.5"})
     assert len(f) == len(FEATURE_NAMES)
-    assert f[0] == 2.0 and f[1] == 1.5
-    assert math.isclose(f[2], math.sin(2 * math.pi * 6 / 24), abs_tol=1e-9)
+    assert f[0] == 2.0 and f[1] == 1.5 and f[2] == 80.0
+    assert math.isclose(f[3], math.sin(2 * math.pi * 6 / 24), abs_tol=1e-9)
 
 
 def test_row_to_features_blank_ecmwf_falls_back_to_bestmatch():
     f = row_to_features({"fc_bestmatch_mm": "3.0", "fc_ecmwf_mm": "",
-                         "hour": "0", "recent_rain_mm": "0"})
+                         "fc_rh_bestmatch": "", "hour": "0", "recent_rain_mm": "0"})
     assert f[1] == 3.0   # blank ECMWF -> best_match value, never 0
+    assert f[2] == 50.0  # blank RH -> neutral 50 (monsoon mean), never 0
 
 
-def test_matured_filters_unlabelled():
-    rows = [{"observed_raining": "1"}, {"observed_raining": ""}, {"observed_raining": "0"}]
-    assert len(matured(rows)) == 2
+def test_row_to_features_old_champion_feature_names():
+    # an old 5-feature model declares its own features; row_to_features maps by NAME
+    old = ["fc_bestmatch_mm", "fc_ecmwf_mm", "hour_sin", "hour_cos", "recent_rain_mm"]
+    f = row_to_features({"fc_bestmatch_mm": "2.0", "fc_ecmwf_mm": "1.0",
+                         "fc_rh_bestmatch": "99", "hour": "12", "recent_rain_mm": "0.1"},
+                        feature_names=old)
+    assert len(f) == 5 and f[0] == 2.0 and f[1] == 1.0
+
+
+def test_matured_filters_unlabelled_and_past_hours():
+    # issued 15:00 UTC = 20:30 IST; forward = valid hour >= 20:30 IST (i.e. >= 21:00)
+    rows = [
+        {"observed_raining": "1", "issued_at": "2026-06-25T15:00", "valid_at": "2026-06-25T21:00"},  # forward
+        {"observed_raining": "", "issued_at": "2026-06-25T15:00", "valid_at": "2026-06-25T22:00"},   # unlabelled
+        {"observed_raining": "0", "issued_at": "2026-06-25T15:00", "valid_at": "2026-06-25T23:00"},  # forward
+        {"observed_raining": "1", "issued_at": "2026-06-25T15:00", "valid_at": "2026-06-25T20:00"},  # past IST
+        {"observed_raining": "0", "issued_at": "2026-06-25T15:00", "valid_at": "2026-06-26T00:00"},  # forward (next day)
+    ]
+    out = matured(rows)
+    assert len(out) == 3   # drops unlabelled + the same-day-past hour
+    assert out[0]["valid_at"] == "2026-06-25T21:00"
 
 
 def test_brier_and_sigmoid():
@@ -47,7 +68,7 @@ def test_train_classifier_learns_separable_signal():
     rows = []
     for v in (0.0, 0.0, 0.0, 5.0, 5.0, 5.0):
         rows.append({"fc_bestmatch_mm": str(v), "fc_ecmwf_mm": str(v),
-                     "hour": "12", "recent_rain_mm": str(v),
+                     "fc_rh_bestmatch": "70", "hour": "12", "recent_rain_mm": str(v),
                      "observed_raining": "1" if v > 0 else "0"})
     X, y = build_xy(rows)
     m = train_classifier(X, y)
@@ -84,7 +105,7 @@ def test_demote_when_champion_worse_than_clim():
 def test_passthrough_serves_raw_and_is_ignored_as_champion():
     m = raw_passthrough_model(0.1724, 0.3384, 0.1783, 100, 25, "2026-07-03T16:00:00Z")
     assert m["type"] != "logistic"            # so nowcast.js serves it as raw...
-    assert m["weights"] == [1.0, 0.0, 0.0, 0.0, 0.0]  # predict = max(0, fc_bestmatch_mm)
+    assert m["weights"][0] == 1.0 and m["weights"][1:] == [0.0] * (len(FEATURE_NAMES) - 1)
     assert m["intercept"] == 0.0
     assert m["features"] == FEATURE_NAMES
     assert m["brier"] == 0.1724 and m["raw_brier"] == 0.1724

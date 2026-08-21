@@ -14,6 +14,7 @@ export const LOG_HEADER = [
   "lon",
   "fc_bestmatch_mm",
   "fc_ecmwf_mm",
+  "fc_rh_bestmatch",
   "hour",
   "recent_rain_mm",
   "observed_raining",
