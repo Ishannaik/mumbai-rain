@@ -9,45 +9,28 @@
     "recent_rain_mm"
   ],
   "weights": [
-<<<<<<< HEAD
-    0.529791,
-    0.708176,
-    0.351268,
-    -0.019002,
-    0.071231
+    0.386816,
+    0.473083,
+    0.184034,
+    -0.100172,
+    -0.886326,
+    0.024073
   ],
-  "intercept": -1.921857,
-  "trained_at": "2026-08-18T02:31:23Z",
-  "n_train": 6828,
-  "n_test": 1708,
-  "brier": 0.1762,
-  "raw_brier": 0.5199,
-  "clim_brier": 0.2068,
-  "champion_brier": 0.177,
+  "intercept": -17.294351,
+  "trained_at": "2026-08-21T10:30:38Z",
+  "n_train": 3843,
+  "n_test": 961,
+  "brier": 0.0613,
+  "raw_brier": 0.4246,
+  "clim_brier": 0.1371,
+  "champion_brier": 0.0706,
   "cv_folds": 4,
   "cv_purge_hours": 6,
   "cv_bss_vs_raw": [
-    -0.0509,
-    0.6248,
-    0.6845,
-    0.5929
+    0.4744,
+    0.6075,
+    0.6473,
+    0.8106
   ],
-  "cv_bss_median": 0.6089
-=======
-    0.360412,
-    0.452372,
-    0.139386,
-    0.207377,
-    -0.280194,
-    0.056783
-  ],
-  "intercept": -13.507665,
-  "trained_at": "2026-08-11T03:57:33Z",
-  "n_train": 2115,
-  "n_test": 529,
-  "brier": 0.0603,
-  "raw_brier": 0.3214,
-  "clim_brier": 0.2053,
-  "champion_brier": 0.0722
->>>>>>> 1a1ba1f (model: RH feature + forward-only training (Brier 0.0722 -> 0.0603))
+  "cv_bss_median": 0.6274
 }
