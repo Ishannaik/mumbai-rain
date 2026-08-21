@@ -1,0 +1,42 @@
+name: CI
+
+# Gate every push and PR: Python pipeline tests + JS parity tests + full Astro
+# build. Deploys stay on Vercel (prod = main, preview = every other branch/PR);
+# this workflow is the quality gate in front of that.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install JS deps
+        run: bun install --frozen-lockfile
+
+      - name: JS tests (rowFeatures / verdict parity)
+        run: bun test
+
+      - name: Set up Python (uv)
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python deps
+        run: uv sync
+
+      - name: Python tests (pipeline)
+        run: uv run python -m pytest -q
+
+      - name: Build (Astro, Sentry no-op without DSN)
+        env:
+          # Keep the build DSN-free so CI never needs Sentry secrets.
+          PUBLIC_SENTRY_DSN: ""
+        run: bun run build
