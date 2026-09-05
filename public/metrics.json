@@ -1,22 +1,22 @@
 {
-  "generated_at": "2026-09-05T18:59:07Z",
+  "generated_at": "2026-09-05T21:09:08Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
-    "n_rows": 14016,
+    "n_rows": 14040,
     "n_labelled": 6660,
-    "n_pending": 7356,
+    "n_pending": 7380,
     "n_rain": 1538,
     "base_rate": 0.2309,
-    "n_runs": 584,
+    "n_runs": 585,
     "first_issued": "2026-06-25T15:00",
-    "last_issued": "2026-09-05T18:00",
-    "hours_since_last_issue": 0.99,
+    "last_issued": "2026-09-05T21:00",
+    "hours_since_last_issue": 0.15,
     "stale_level": "ok",
-    "gap_count_gt_1h": 317,
+    "gap_count_gt_1h": 318,
     "max_gap_h": 511.0,
     "unique_valid": 1133
   },
