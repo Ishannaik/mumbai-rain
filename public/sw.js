@@ -6,7 +6,7 @@
 // scoreboard bake ("Couldn't read the log") can never stick in cache-first
 // forever. Static assets stay cache-first.
 
-const CACHE = "paus-v2";
+const CACHE = "paus-v3";
 
 // Only stable, path-addressable URLs are precached. Astro's hashed JS/CSS bundles
 // are NOT listed here (their names change every build) — they are picked up at
@@ -19,7 +19,7 @@ const NETWORK_FIRST_HOSTS = ["api.open-meteo.com", "air-quality-api.open-meteo.c
 
 // Same-origin paths that must never be stuck on a stale HTML/JSON snapshot.
 // Scoreboard + metrics change with every data push; cache-first hid failures.
-const NETWORK_FIRST_PATHS = ["/scoreboard", "/metrics.json", "/model.json"];
+const NETWORK_FIRST_PATHS = ["/scoreboard", "/metrics.json", "/model.json", "/data/localities.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

@@ -213,8 +213,8 @@ const defaultIdx = defaultLocality
   <script>
     import { verdict } from "../lib/nowcast.js";
     import { nearestZone, floodRisk } from "../lib/flood.js";
-    import { groupLocalities } from "../lib/localities.js";
-    import { MAP_TILES, indiaGeocodeUrl } from "../lib/geo.js";
+    import { groupCities } from "../lib/localities.js";
+    import { MAP_TILES, indiaGeocodeUrl, indiaOnly } from "../lib/geo.js";
 
     // --- DOM handles ---
     const app = document.getElementById("app");
@@ -244,8 +244,12 @@ const defaultIdx = defaultLocality
     let pick = null;          // sheet refs: { overlay, sheet, input, status, empty, locateBtn, locateLabel, locateErr }
     let trigger = null;       // the pill button that opens the picker
     let triggerName = null;   // the pill's visible area label
-    let rowEls = [];          // picker rows (each carries data-idx)
-    let groupHeadEls = [];    // region headers (hidden while searching)
+    let cityRowEls = [];      // step 1: one row per city
+    let locRowEls = [];       // step 2: neighbourhoods (Mumbai)
+    let cityHeadEls = [];
+    let rowEls = [];          // alias of locRowEls for selectIndex highlighting
+    let pickView = "cities";  // "cities" | "areas"
+    let activeMetro = null;   // city object when drilling into neighbourhoods
     let pickerOpen = false;
     let lastFocus = null;     // element to restore focus to on close
     let geoQuery = "";        // backing query for the "search anywhere" geocode fallback
@@ -721,19 +725,20 @@ const defaultIdx = defaultLocality
         role: "dialog", "aria-modal": "true", "aria-labelledby": "locpick-title",
       });
       overlay.appendChild(sheet);
-
       sheet.appendChild(el("div", "locpick-grab", { "aria-hidden": "true" }));
-
       const head = el("div", "locpick-head");
       const heading = el("div", "locpick-heading");
-      const eyebrow = el("p", "locpick-eyebrow"); eyebrow.textContent = "India";
+      const eyebrow = el("p", "locpick-eyebrow"); eyebrow.textContent = "Step 1";
       const title = el("h2", "locpick-title", { id: "locpick-title" });
-      title.textContent = "Where are you?";
+      title.textContent = "Which city?";
       heading.appendChild(eyebrow); heading.appendChild(title);
+      const back = el("button", "locpick-back", { type: "button", hidden: "" });
+      back.textContent = "‹ Cities";
+      back.addEventListener("click", showCities);
       const close = el("button", "locpick-close", { type: "button", "aria-label": "Close" });
       close.innerHTML = "&#10005;";
       close.addEventListener("click", closePicker);
-      head.appendChild(heading); head.appendChild(close);
+      head.appendChild(back); head.appendChild(heading); head.appendChild(close);
       sheet.appendChild(head);
 
       const tools = el("div", "locpick-tools");
@@ -741,10 +746,10 @@ const defaultIdx = defaultLocality
       const glyph = el("span", "locpick-search-glyph", { "aria-hidden": "true" });
       glyph.textContent = "⌕";
       const label = el("label", "locpick-vh", { for: "locpick-input" });
-      label.textContent = "Search city, area, or state";
+      label.textContent = "Search a city in India";
       const input = el("input", "locpick-input", {
         id: "locpick-input", type: "text", autocomplete: "off",
-        autocapitalize: "off", spellcheck: "false", placeholder: "Search city, area, or state…",
+        autocapitalize: "off", spellcheck: "false", placeholder: "Type a city — Pune, Chennai, Delhi…",
       });
       searchWrap.appendChild(glyph);
       searchWrap.appendChild(label);
@@ -756,8 +761,6 @@ const defaultIdx = defaultLocality
         '<span class="locpick-locate-label">Use my location</span>';
       const locateErr = el("p", "locpick-locate-err", { role: "alert", hidden: "" });
 
-      // "Pin it on the map" — opens a lazy-loaded map for a true any-point pick
-      // (a spot between areas, or precise East/West).
       const mapBtn = el("button", "locpick-mapbtn", { type: "button" });
       mapBtn.innerHTML =
         '<span class="locpick-mapbtn-ico" aria-hidden="true">◎</span>' +
@@ -773,33 +776,59 @@ const defaultIdx = defaultLocality
       const status = el("p", "locpick-status locpick-vh", { role: "status", "aria-live": "polite" });
       list.appendChild(status);
 
+      cityRowEls = [];
+      locRowEls = [];
+      cityHeadEls = [];
       rowEls = [];
-      groupHeadEls = [];
-      groupLocalities(LOCALITIES).forEach((g) => {
+
+      groupCities(LOCALITIES).forEach((g) => {
         const gh = el("div", "locpick-group-head");
+        gh.dataset.kind = "city";
         gh.dataset.title = g.title.toLowerCase();
         const gt = el("span", "locpick-group-title"); gt.textContent = g.title;
         const gn = el("span", "locpick-group-n", { "aria-hidden": "true" });
         gn.textContent = String(g.items.length);
         gh.appendChild(gt); gh.appendChild(gn);
         list.appendChild(gh);
-        groupHeadEls.push(gh);
-        g.items.forEach((i) => {
-          const loc = LOCALITIES[i];
+        cityHeadEls.push(gh);
+        g.items.forEach((city) => {
+          const nAreas = city.children.length;
           const row = el("button", "locpick-row", {
-            type: "button", "data-idx": String(i),
-            "aria-label": `${loc.name}, ${g.title}`,
+            type: "button",
+            "aria-label": nAreas ? `${city.name}, ${nAreas} areas` : `${city.name}, ${city.state}`,
           });
-          row.dataset.name = loc.name.toLowerCase();
-          row.dataset.group = g.title.toLowerCase();
-          const nm = el("span", "locpick-row-name"); nm.textContent = loc.name;
+          row.dataset.kind = "city";
+          row.dataset.name = city.name.toLowerCase();
+          row.dataset.group = (city.state || g.title).toLowerCase();
+          const nm = el("span", "locpick-row-name"); nm.textContent = city.name;
           const co = el("span", "locpick-row-coord", { "aria-hidden": "true" });
-          co.textContent = loc.metro ? `${loc.lat.toFixed(2)}°N` : (loc.state || "");
+          co.textContent = nAreas ? `${nAreas} areas` : city.state;
           row.appendChild(nm); row.appendChild(co);
-          row.addEventListener("click", () => selectArea(i));
+          row.addEventListener("click", () => selectCity(city));
           list.appendChild(row);
-          rowEls.push(row);
+          cityRowEls.push(row);
         });
+      });
+
+      LOCALITIES.forEach((loc, i) => {
+        if (!loc.metro) return;
+        const row = el("button", "locpick-row", {
+          type: "button", "data-idx": String(i),
+          "aria-label": `${loc.name}, ${loc.metro}`,
+        });
+        row.hidden = true;
+        row.dataset.kind = "area";
+        row.dataset.metro = loc.metro;
+        row.dataset.name = loc.name.toLowerCase();
+        row.dataset.idx = String(i);
+        const nm = el("span", "locpick-row-name"); nm.textContent = loc.name;
+        const co = el("span", "locpick-row-coord", { "aria-hidden": "true" });
+        co.textContent = `${loc.lat.toFixed(2)}°N`;
+        row.appendChild(nm); row.appendChild(co);
+        row.addEventListener("click", () => selectArea(i));
+        list.appendChild(row);
+        locRowEls.push(row);
+        rowEls.push(row);
       });
       const empty = el("p", "locpick-empty", { hidden: "" });
       list.appendChild(empty);
@@ -871,6 +900,7 @@ const defaultIdx = defaultLocality
       pick = {
         overlay, sheet, input, status, empty, locateBtn,
         locateLabel: locateBtn.querySelector(".locpick-locate-label"), locateErr,
+        title, eyebrow, back,
         mapEl, mapNearName: mapNear.querySelector(".locpick-mapnear-name"),
         mapInput, mapHits,
         geoBtn, geoBtnLabel: geoBtn.querySelector(".locpick-geo-label"), geoStatus, geoList,
@@ -881,27 +911,86 @@ const defaultIdx = defaultLocality
       locPill.appendChild(trigger);
     }
 
-    function visibleRows() { return rowEls.filter((b) => !b.hidden); }
+    function visibleRows() {
+      const rows = pickView === "areas" ? locRowEls : cityRowEls;
+      return rows.filter((b) => !b.hidden);
+    }
+
+    function showCities() {
+      pickView = "cities";
+      activeMetro = null;
+      if (pick.back) pick.back.hidden = true;
+      if (pick.eyebrow) pick.eyebrow.textContent = "Step 1";
+      if (pick.title) pick.title.textContent = "Which city?";
+      if (pick.input) {
+        pick.input.value = "";
+        pick.input.placeholder = "Type a city — Pune, Chennai, Delhi…";
+      }
+      locRowEls.forEach((b) => { b.hidden = true; });
+      filterRows();
+    }
+
+    function showLocalities(city) {
+      pickView = "areas";
+      activeMetro = city;
+      if (pick.back) pick.back.hidden = false;
+      if (pick.eyebrow) pick.eyebrow.textContent = "Step 2 · pick an area";
+      if (pick.title) pick.title.textContent = city.name;
+      if (pick.input) {
+        pick.input.value = "";
+        pick.input.placeholder = `Search an area in ${city.name}…`;
+      }
+      cityRowEls.forEach((b) => { b.hidden = true; });
+      cityHeadEls.forEach((h) => { h.hidden = true; });
+      filterRows();
+    }
+
+    function selectCity(city) {
+      if (city.children && city.children.length) {
+        showLocalities(city);
+        return;
+      }
+      selectIndex(city.index);
+      closePicker();
+      render(LOCALITIES[city.index]);
+    }
 
     function filterRows() {
       const raw = pick.input.value.trim();
       const q = raw.toLowerCase();
       let n = 0;
-      rowEls.forEach((b) => {
-        const match = !q || b.dataset.name.includes(q) || (b.dataset.group || "").includes(q);
-        b.hidden = !match;
-        if (match) n++;
-      });
-      groupHeadEls.forEach((h) => {
-        if (!q) { h.hidden = false; return; }
-        h.hidden = !(h.dataset.title || "").includes(q);
-      });
+      if (pickView === "areas") {
+        const metro = activeMetro ? activeMetro.name : "";
+        cityRowEls.forEach((b) => { b.hidden = true; });
+        cityHeadEls.forEach((h) => { h.hidden = true; });
+        locRowEls.forEach((b) => {
+          const inCity = b.dataset.metro === metro;
+          const match = inCity && (!q || b.dataset.name.includes(q));
+          b.hidden = !match;
+          if (match) n++;
+        });
+      } else {
+        locRowEls.forEach((b) => { b.hidden = true; });
+        cityRowEls.forEach((b) => {
+          const match = !q || b.dataset.name.includes(q) || (b.dataset.group || "").includes(q);
+          b.hidden = !match;
+          if (match) n++;
+        });
+        cityHeadEls.forEach((h) => {
+          if (!q) { h.hidden = false; return; }
+          const titleHit = (h.dataset.title || "").includes(q);
+          const childHit = cityRowEls.some((b) => !b.hidden && b.dataset.group === h.dataset.title);
+          h.hidden = !titleHit && !childHit;
+        });
+      }
       pick.empty.hidden = n > 0;
-      if (!n) pick.empty.textContent = `No place matches “${raw}”.`;
-      pick.status.textContent = n ? `${n} place${n === 1 ? "" : "s"}` : "No matches";
+      if (!n) pick.empty.textContent = pickView === "areas"
+        ? `No area matches “${raw}”.`
+        : `No Indian city matches “${raw}”.`;
+      pick.status.textContent = n ? `${n}` : "No matches";
 
       resetGeocode();
-      if (!n && raw.length >= 2) {
+      if (pickView === "cities" && !n && raw.length >= 2) {
         geoQuery = raw;
         pick.geoBtnLabel.textContent = `Search “${raw}” in India`;
         pick.geoBtn.hidden = false;
@@ -937,7 +1026,7 @@ const defaultIdx = defaultLocality
         if (!r.ok) throw new Error(`geocoder ${r.status}`);
         const data = await r.json();
         if (token !== geoToken) return;              // superseded by newer typing/search
-        const results = (data && data.results) || [];
+        const results = indiaOnly((data && data.results) || []);
         if (!results.length) {
           pick.geoStatus.textContent = `No place found for “${q}”.`;
           return;
@@ -1006,19 +1095,14 @@ const defaultIdx = defaultLocality
       if (pickerOpen || !pick) return;
       pickerOpen = true;
       lastFocus = document.activeElement;
-      pick.input.value = "";
       pick.locateErr.hidden = true;
-      pick.sheet.classList.remove("is-mapmode"); // always open on the area list
-      filterRows();
+      pick.sheet.classList.remove("is-mapmode");
+      showCities();
       pick.overlay.classList.add("is-open");
       trigger.setAttribute("aria-expanded", "true");
       document.body.classList.add("locpick-lock");
       app.toggleAttribute("inert", true);
-      requestAnimationFrame(() => {
-        pick.input.focus();
-        const act = rowEls.find((b) => b.classList.contains("is-active"));
-        if (act) act.scrollIntoView({ block: "center" });
-      });
+      requestAnimationFrame(() => { pick.input.focus(); });
     }
 
     function closePicker() {
@@ -1109,7 +1193,7 @@ const defaultIdx = defaultLocality
         if (!r.ok) throw new Error(`geocoder ${r.status}`);
         const data = await r.json();
         if (token !== mapSearchToken) return;
-        const results = (data && data.results) || [];
+        const results = indiaOnly((data && data.results) || []);
         pick.mapHits.textContent = "";
         if (!results.length) {
           const p = el("p", "locpick-maphits-empty");

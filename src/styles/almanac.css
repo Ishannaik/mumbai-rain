@@ -411,6 +411,15 @@ body::before {
   transition: color .2s ease;
 }
 .locpick-close:hover { color: var(--ink); }
+.locpick-back {
+  flex: none; appearance: none; background: transparent; border: 0; cursor: pointer;
+  align-self: center; padding: 8px 0; margin-right: 4px;
+  color: var(--ink-soft); font-family: "IBM Plex Mono", monospace;
+  font-size: .75rem; white-space: nowrap;
+}
+.locpick-back:hover { color: var(--ink); }
+.locpick-back[hidden] { display: none; }
+.locpick-heading { flex: 1; min-width: 0; }
 
 .locpick-tools {
   flex: none; display: flex; flex-direction: column; gap: 10px;

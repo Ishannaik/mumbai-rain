@@ -11,6 +11,10 @@ export const MAP_TILES = {
 export function indiaGeocodeUrl(q) {
   return (
     "https://geocoding-api.open-meteo.com/v1/search" +
-    `?name=${encodeURIComponent(q)}&count=6&language=en&format=json&country=IN`
+    `?name=${encodeURIComponent(q)}&count=6&language=en&format=json&countryCode=IN`
   );
+}
+
+export function indiaOnly(results) {
+  return (results || []).filter((r) => r && r.country_code === "IN");
 }

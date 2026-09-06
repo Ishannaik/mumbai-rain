@@ -6,7 +6,7 @@
 // silently dropping a row.
 
 import { test, expect } from "bun:test";
-import { groupOf, groupLocalities } from "./localities.js";
+import { groupOf, groupLocalities, cityCatalog, groupCities } from "./localities.js";
 import { slugify } from "./slug.js";
 import catalog from "../data/localities.json";
 
@@ -83,4 +83,24 @@ test("catalog slugs are unique so SEO pages do not collide", () => {
 
 test("live catalog still pins Mumbai first", () => {
   expect(groupLocalities(catalog)[0].title).toBe("Mumbai");
+});
+
+test("cityCatalog treats Pune as a city with no neighbourhoods", () => {
+  const { cities, metros } = cityCatalog([colaba, pune, chennai]);
+  expect(metros).toHaveLength(1);
+  expect(metros[0].name).toBe("Mumbai");
+  expect(metros[0].children).toEqual([0]);
+  expect(cities.map((c) => c.name)).toEqual(["Pune", "Chennai"]);
+  expect(cities.find((c) => c.name === "Pune").children).toEqual([]);
+});
+
+test("groupCities lists Mumbai as one city, not 146 areas", () => {
+  const groups = groupCities(catalog);
+  expect(groups[0].title).toBe("Mumbai");
+  expect(groups[0].items).toHaveLength(1);
+  expect(groups[0].items[0].name).toBe("Mumbai");
+  expect(groups[0].items[0].children.length).toBeGreaterThan(100);
+  const mh = groups.find((g) => g.title === "Maharashtra");
+  expect(mh.items.some((c) => c.name === "Pune")).toBe(true);
+  expect(mh.items.some((c) => c.name === "Colaba")).toBe(false);
 });
