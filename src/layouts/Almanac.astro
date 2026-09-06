@@ -214,6 +214,7 @@ const defaultIdx = defaultLocality
     import { verdict } from "../lib/nowcast.js";
     import { nearestZone, floodRisk } from "../lib/flood.js";
     import { groupLocalities } from "../lib/localities.js";
+    import { MAP_TILES, indiaGeocodeUrl } from "../lib/geo.js";
 
     // --- DOM handles ---
     const app = document.getElementById("app");
@@ -819,6 +820,17 @@ const defaultIdx = defaultLocality
 
       // --- Map view (hidden until "Pin it on the map"); Leaflet loads on demand. ---
       const mapView = el("div", "locpick-mapview");
+      const mapSearch = el("div", "locpick-mapsearch");
+      const mapSearchLabel = el("label", "locpick-vh", { for: "locpick-map-input" });
+      mapSearchLabel.textContent = "Search a place in India";
+      const mapInput = el("input", "locpick-input", {
+        id: "locpick-map-input", type: "text", autocomplete: "off",
+        autocapitalize: "off", spellcheck: "false",
+        placeholder: "Search a place in India…",
+      });
+      mapSearch.appendChild(mapSearchLabel);
+      mapSearch.appendChild(mapInput);
+      const mapHits = el("div", "locpick-maphits");
       const mapWrap = el("div", "locpick-map-wrap");
       const mapEl = el("div", "locpick-map");
       const mapPin = el("div", "locpick-mappin", { "aria-hidden": "true" });
@@ -832,7 +844,10 @@ const defaultIdx = defaultLocality
       const mapUse = el("button", "locpick-mapuse", { type: "button" });
       mapUse.textContent = "Use this spot";
       mapBar.appendChild(mapBack); mapBar.appendChild(mapNear); mapBar.appendChild(mapUse);
-      mapView.appendChild(mapWrap); mapView.appendChild(mapBar);
+      mapView.appendChild(mapSearch);
+      mapView.appendChild(mapHits);
+      mapView.appendChild(mapWrap);
+      mapView.appendChild(mapBar);
       sheet.appendChild(mapView);
 
       // Wiring.
@@ -849,6 +864,7 @@ const defaultIdx = defaultLocality
       mapBtn.addEventListener("click", openMapMode);
       mapBack.addEventListener("click", closeMapMode);
       mapUse.addEventListener("click", useMapSpot);
+      mapInput.addEventListener("input", onMapSearchInput);
       overlay.addEventListener("click", (e) => { if (e.target === overlay) closePicker(); });
       document.addEventListener("keydown", onGlobalKeydown);
 
@@ -856,6 +872,7 @@ const defaultIdx = defaultLocality
         overlay, sheet, input, status, empty, locateBtn,
         locateLabel: locateBtn.querySelector(".locpick-locate-label"), locateErr,
         mapEl, mapNearName: mapNear.querySelector(".locpick-mapnear-name"),
+        mapInput, mapHits,
         geoBtn, geoBtnLabel: geoBtn.querySelector(".locpick-geo-label"), geoStatus, geoList,
       };
 
@@ -915,9 +932,7 @@ const defaultIdx = defaultLocality
       pick.geoStatus.hidden = false;
       pick.geoStatus.textContent = "Searching…";
       try {
-        const url =
-          `https://geocoding-api.open-meteo.com/v1/search` +
-          `?name=${encodeURIComponent(q)}&count=6&language=en&format=json&country=IN`;
+        const url = indiaGeocodeUrl(q);
         const r = await fetch(url);
         if (!r.ok) throw new Error(`geocoder ${r.status}`);
         const data = await r.json();
@@ -1028,10 +1043,10 @@ const defaultIdx = defaultLocality
       render(LOCALITIES[idx]);
     }
 
-    // --- Map pin picker — lazy Leaflet, "center pin" pattern (drag the map, the
-    // pin holds centre; read getCenter()). Free CARTO Positron tiles ($0, but the
-    // CARTO/OSM tile policy is low-volume + attribution — fine at this scale). ---
-    let leafletP = null, lmap = null;
+    // --- Map pin picker — lazy Leaflet, center-pin (drag map, read getCenter()).
+    // OSM raster tiles: Carto Positron now watermarks "API KEY REQUIRED".
+    // Search: keyless Open-Meteo geocoder, country=IN. ---
+    let leafletP = null, lmap = null, mapSearchTimer = 0, mapSearchToken = 0;
     function loadLeaflet() {
       if (window.L) return Promise.resolve(window.L);
       if (leafletP) return leafletP;
@@ -1050,25 +1065,87 @@ const defaultIdx = defaultLocality
       });
       return leafletP;
     }
+    function mapStart() {
+      if (activeLoc) return { lat: activeLoc.lat, lon: activeLoc.lon, zoom: 12 };
+      return { lat: 22.9734, lon: 78.6569, zoom: 5 }; // India centroid
+    }
     function openMapMode() {
       pick.sheet.classList.add("is-mapmode");
       loadLeaflet().then((L) => {
+        const start = mapStart();
         if (!lmap) {
-          lmap = L.map(pick.mapEl, { zoomControl: true }).setView([19.076, 72.8777], 11);
-          L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-            attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 19,
+          lmap = L.map(pick.mapEl, { zoomControl: true }).setView([start.lat, start.lon], start.zoom);
+          L.tileLayer(MAP_TILES.url, {
+            attribution: MAP_TILES.attribution, maxZoom: MAP_TILES.maxZoom,
           }).addTo(lmap);
           lmap.on("moveend", updateMapNearest);
+        } else {
+          lmap.setView([start.lat, start.lon], start.zoom);
         }
-        lmap.invalidateSize(); // the container was display:none at create time
+        lmap.invalidateSize();
         updateMapNearest();
+        if (pick.mapInput) pick.mapInput.focus();
       }).catch(() => {
         pick.sheet.classList.remove("is-mapmode");
         pick.locateErr.hidden = false;
         pick.locateErr.textContent = "Map couldn’t load. Pick an area below.";
       });
     }
-    function closeMapMode() { pick.sheet.classList.remove("is-mapmode"); }
+    function closeMapMode() {
+      pick.sheet.classList.remove("is-mapmode");
+      if (pick.mapHits) pick.mapHits.textContent = "";
+    }
+    function onMapSearchInput() {
+      const q = pick.mapInput.value.trim();
+      pick.mapHits.textContent = "";
+      clearTimeout(mapSearchTimer);
+      if (q.length < 2) return;
+      mapSearchTimer = setTimeout(() => searchMap(q), 280);
+    }
+    async function searchMap(q) {
+      const token = ++mapSearchToken;
+      try {
+        const r = await fetch(indiaGeocodeUrl(q));
+        if (!r.ok) throw new Error(`geocoder ${r.status}`);
+        const data = await r.json();
+        if (token !== mapSearchToken) return;
+        const results = (data && data.results) || [];
+        pick.mapHits.textContent = "";
+        if (!results.length) {
+          const p = el("p", "locpick-maphits-empty");
+          p.textContent = `No place found for “${q}”.`;
+          pick.mapHits.appendChild(p);
+          return;
+        }
+        results.slice(0, 6).forEach((res) => {
+          const where = [res.admin1, res.country_code].filter(Boolean).join(" · ");
+          const row = el("button", "locpick-row", {
+            type: "button",
+            "aria-label": [res.name, res.admin1, res.country].filter(Boolean).join(", "),
+          });
+          const nm = el("span", "locpick-row-name"); nm.textContent = res.name;
+          const co = el("span", "locpick-row-coord", { "aria-hidden": "true" });
+          co.textContent = where;
+          row.appendChild(nm); row.appendChild(co);
+          row.addEventListener("click", () => flyMapTo(res));
+          pick.mapHits.appendChild(row);
+        });
+      } catch (err) {
+        if (token !== mapSearchToken) return;
+        pick.mapHits.textContent = "";
+        const p = el("p", "locpick-maphits-empty");
+        p.textContent = "Search failed — check your connection.";
+        pick.mapHits.appendChild(p);
+        console.error("Map search failed.", err);
+      }
+    }
+    function flyMapTo(res) {
+      pick.mapHits.textContent = "";
+      if (pick.mapInput) pick.mapInput.value = res.name;
+      if (!lmap) return;
+      lmap.setView([res.latitude, res.longitude], 13);
+      updateMapNearest();
+    }
     function updateMapNearest() {
       const c = lmap.getCenter();
       pick.mapNearName.textContent = nearestLocality(c.lat, c.lng).name;

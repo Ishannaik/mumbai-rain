@@ -575,6 +575,19 @@ body.locpick-lock { overflow: hidden; }
 .locpick-sheet.is-mapmode .locpick-tools { display: none; }
 .locpick-sheet.is-mapmode .locpick-mapview { display: flex; flex-direction: column; gap: var(--s-3); }
 
+.locpick-mapsearch { display: flex; }
+.locpick-mapsearch .locpick-input { width: 100%; }
+.locpick-maphits:empty { display: none; }
+.locpick-maphits {
+  max-height: 28vh; overflow: auto;
+  border: 1px solid var(--rule); background: var(--paper);
+}
+.locpick-maphits-empty {
+  margin: 0; padding: 12px 16px;
+  font-family: "IBM Plex Mono", monospace; font-size: .78rem; color: var(--ink-soft);
+}
+.locpick-maphits .locpick-row { width: 100%; }
+
 .locpick-map-wrap {
   position: relative; height: 44vh; min-height: 260px;
   border: 1px solid var(--rule); overflow: hidden;
