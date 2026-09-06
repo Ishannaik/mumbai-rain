@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.1.0",
   "private": true,
-  "description": "Hyperlocal Mumbai 0–2h rain nowcast — calibrated bias-correction of free forecasts, self-improving via free GitHub Actions crons.",
+  "description": "Hyperlocal India 0–2h rain nowcast — Open-Meteo in the browser, Mumbai neighbourhoods plus cities nationwide, self-improving via free GitHub Actions crons.",
   "homepage": "https://rain.ishannaik.com",
   "repository": {
     "type": "git",

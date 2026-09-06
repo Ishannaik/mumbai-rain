@@ -6,7 +6,10 @@
 // Upgrade path: a flood-depth surrogate trained on historical waterlogging.
 
 // Nearest curated hotspot to (lat, lon) by squared degree distance.
-// Good enough at city scale; avoids a sqrt we don't need for a min.
+// ~0.5° ≈ 55 km: covers MMR, excludes Pune/Chennai. Avoids a sqrt we don't
+// need for a min. Too-far queries return null so the UI hides flood watch.
+const MAX_DEG2 = 0.5 * 0.5;
+
 export function nearestZone(lat, lon, zones) {
   let best = null;
   let bestD = Infinity;
@@ -17,14 +20,15 @@ export function nearestZone(lat, lon, zones) {
       best = z;
     }
   }
+  if (best == null || bestD > MAX_DEG2) return null;
   return best;
 }
 
 // Combine forecast peak (mm/h) with zone severity (1..3) into a level.
 // score = peakMm * severity, so a chronic spot escalates faster than a mild one.
 export function floodRisk(peakMm, zone) {
-  const severity = zone ? zone.severity : 1;
-  const score = peakMm * severity;
+  if (!zone) return { level: "low", reason: "no flood map for this area" };
+  const score = peakMm * zone.severity;
   if (score >= 12)
     return { level: "high", reason: `heavy rain over ${zone.name} (chronic flood spot)` };
   if (score >= 4)

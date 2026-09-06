@@ -1,9 +1,9 @@
-// /api/nowcast — the Mumbai Rain API. Query a Mumbai spot (lat/lon or locality
-// name/slug) and get the calibrated nowcast verdict as JSON — the same math the
-// UI runs, served server-side so anything can call it.
+// /api/nowcast — query a spot (lat/lon or catalog name/slug) and get the
+// nowcast verdict as JSON — the same math the UI runs, served server-side.
 //
 //   GET /api/nowcast?lat=19.06&lon=72.83&hours=2
 //   GET /api/nowcast?locality=bandra&hours=3
+//   GET /api/nowcast?locality=chennai
 //   GET /api/nowcast?locality=Andheri%20East
 //
 // Pure on top of the SAME modules the island uses (nowcast.js, flood.js,
@@ -20,7 +20,7 @@ export const prerender = false;
 const MAX_HOURS = 24;
 const MIN_HOURS = 1;
 
-// Resolve a spot from the curated 146 areas — by exact name OR slug, either case.
+// Resolve a spot from the catalog — by exact name OR slug, either case.
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 function resolveLocality(q) {

@@ -5,9 +5,9 @@
 // (Page.astro); page-specific styling lives in the scoped <style> below.
 import Page from "../layouts/Page.astro";
 
-const title = "How पाऊस works — Mumbai rain nowcast method";
+const title = "How पाऊस works — rain nowcast method";
 const description =
-  "How the free Mumbai rain forecast app works: keyless Open-Meteo, independent METAR labels from VABB airport, calibrated logistic model behind an eval gate. What it claims — and what it doesn't.";
+  "How the free India rain forecast app works: keyless Open-Meteo, independent METAR labels from VABB airport, calibrated logistic model behind an eval gate. What it claims — and what it doesn't.";
 ---
 <Page title={title} description={description} canonicalPath="/about" active="about">
   <!-- Lede -->
@@ -146,7 +146,7 @@ const description =
         <h3>What it doesn't claim</h3>
         <ul>
           <li>To out-predict <b>frontier AI</b> weather models (GraphCast, AIFS and the like) at their own game.</li>
-          <li>To use <b>live radar</b> — there's none on the free path. This is a calibrated correction of a public forecast for one city.</li>
+          <li>To use <b>live radar</b> — there's none on the free path. The map covers India; the model is a calibrated correction trained on Mumbai airport observations.</li>
           <li>Any number you can't check: the live model's real scorecard is computed on logged outcomes, not asserted here.</li>
         </ul>
       </div>

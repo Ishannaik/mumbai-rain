@@ -1,7 +1,6 @@
 ---
-// Per-locality SEO pages — one static, pre-rendered page per area (/bandra,
-// /kandivali, … all 36). Each defaults the app to that locality and carries
-// locality-specific title/h1/meta for "rain in <area> right now".
+// Per-place SEO pages — one static page per catalog row (/bandra, /chennai, …).
+// Each defaults the app to that place and carries place-specific title/h1/meta.
 import Almanac from "../layouts/Almanac.astro";
 import { slugify } from "../lib/slug.js";
 import localities from "../data/localities.json";
@@ -17,9 +16,9 @@ const { loc } = Astro.props;
 const area = loc.name;
 
 const title = `पाऊस · Rain in ${area} right now — next 2 hours`;
+const where = loc.metro === "Mumbai" ? `${area}, Mumbai` : (loc.state ? `${area}, ${loc.state}` : area);
 const description =
-  `Will it rain in ${area}, Mumbai in the next 2 hours? A live, 2-second verdict ` +
-  `for ${area} — leave now or wait. Flood-risk watch + calibrated forecast.`;
+  `Will it rain in ${where} in the next 2 hours? A live, 2-second verdict for ${area} — leave now or wait.`;
 ---
 <Almanac
   title={title}

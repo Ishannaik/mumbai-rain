@@ -1,10 +1,10 @@
-# पाऊस · Mumbai Rain
+# पाऊस · Rain
 
-**Will it rain at your exact Mumbai spot in the next 2 hours?**
+**Will it rain at your exact spot in the next 2 hours?**
 
 Live site: **[rain.ishannaik.com](https://rain.ishannaik.com)**
 
-A hyperlocal, ad-free, no-install nowcast for Mumbai. One verdict in ~2 seconds — leave now or wait — plus a flood-risk watch for nearby low spots. Runs at **$0** (static site + free forecast API + free GitHub Actions crons).
+A hyperlocal, ad-free, no-install nowcast for India. GPS or pick a city (Mumbai still has neighbourhoods). One verdict in ~2 seconds — leave now or wait — plus a flood-risk watch for Mumbai low spots. Runs at **$0** (static site + free forecast API + free GitHub Actions crons).
 
 ## What it is
 
@@ -69,7 +69,7 @@ Python 3.11+. Uses `uv` — no hand-rolled venv paths.
 
 ```http
 GET /api/nowcast?lat=19.06&lon=72.83&hours=2
-GET /api/nowcast?locality=bandra&hours=3
+GET /api/nowcast?locality=chennai&hours=3
 ```
 
 Returns JSON: calibrated rain probability, verdict text, flood-risk nearest zone, and the inputs used. Same modules as the UI (`nowcast.js`, `flood.js`, `open-meteo.js`).
@@ -84,7 +84,7 @@ Returns JSON: calibrated rain probability, verdict text, flood-risk nearest zone
 
 ## Design notes
 
-- **Mumbai only** — hyperspecialized, not a global weather app
+- **India** — cities nationwide, Mumbai neighbourhoods kept; flood watch is Mumbai-only
 - **No API keys on the live path** — Open-Meteo is keyless and CORS-friendly
 - **No silent “AI magic”** — method, data split, and scoreboard are public
 - Product voice and method: site `/about`; early specs live under `archive/`

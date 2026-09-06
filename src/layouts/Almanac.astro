@@ -1,5 +1,5 @@
 ---
-// Almanac.astro — the shared shell for every page (home + 36 locality pages).
+// Almanac.astro — the shared shell for home + per-place pages.
 // Renders the FULL Monsoon Almanac as static HTML (zero-JS, SEO-friendly): the
 // verdict h1 carries real, locality-specific text so the page is meaningful and
 // robust even if the client script never runs. ONE bundled <script> island then
@@ -9,6 +9,7 @@
 // native <select>; if the island never runs, the bare <select> still works.
 import "../styles/almanac.css";
 import localities from "../data/localities.json";
+import { groupLocalities } from "../lib/localities.js";
 
 export interface Props {
   title: string;
@@ -34,7 +35,8 @@ const canonical = new URL(canonicalPath, Astro.site).href;
 // Social preview card — one on-brand 1200×630 card, reused across the locality
 // pages (each page still carries its own og:title/description).
 const ogImage = new URL("/og/og-card.png", Astro.site).href;
-const siteName = "पाऊस · Mumbai Rain";
+const siteName = "पाऊस · Rain";
+const groups = groupLocalities(localities);
 
 // Index of the pre-selected locality for the no-JS <select> (-1 on the home
 // page, where geolocation decides and the bare control shows the first option
@@ -55,8 +57,8 @@ const defaultIdx = defaultLocality
   <meta name="theme-color" content="#dde2dc" />
   <meta name="color-scheme" content="light only" />
   <meta name="darkreader-lock" />
-  <meta name="geo.region" content="IN-MH" />
-  <meta name="geo.placename" content="Mumbai" />
+  <meta name="geo.region" content="IN" />
+  <meta name="geo.placename" content="India" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -71,7 +73,7 @@ const defaultIdx = defaultLocality
   <meta property="og:image" content={ogImage} />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="Mumbai rain nowcast — will it rain at your spot in the next 2 hours?" />
+  <meta property="og:image:alt" content="Rain nowcast — will it rain at your spot in the next 2 hours?" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content={title} />
   <meta name="twitter:description" content={description} />
@@ -84,10 +86,10 @@ const defaultIdx = defaultLocality
       {
         "@type": "WebSite",
         "@id": new URL("/#website", Astro.site).href,
-        "name": "Mumbai Rain — next 2 hours",
+        "name": "पाऊस — rain in the next 2 hours",
         "alternateName": ["पाऊस", "Paaus", siteName],
         "url": new URL("/", Astro.site).href,
-        "description": "Hyperlocal Mumbai rain nowcast: will it rain at your exact spot in the next 2 hours, with a flood watch.",
+        "description": "Hyperlocal India rain nowcast: will it rain at your exact spot in the next 2 hours.",
         "inLanguage": ["en", "mr"],
         "publisher": {
           "@type": "Person",
@@ -97,13 +99,13 @@ const defaultIdx = defaultLocality
       },
       {
         "@type": "WebApplication",
-        "name": "पाऊस · Mumbai Rain",
+        "name": "पाऊस · Rain",
         "url": new URL("/", Astro.site).href,
         "applicationCategory": "WeatherApplication",
         "operatingSystem": "Any",
         "browserRequirements": "Requires JavaScript for live nowcast",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
-        "description": "Free Mumbai 0–2 hour rain nowcast with flood watch and public skill scoreboard.",
+        "description": "Free India 0–2 hour rain nowcast with flood watch in Mumbai and a public skill scoreboard.",
       },
     ],
   })} />
@@ -148,9 +150,13 @@ const defaultIdx = defaultLocality
       </nav>
       <span class="loc-pill">
         <span class="loc-pin" aria-hidden="true">📍</span>
-        <select id="locality" aria-label="Choose your Mumbai area">
-          {localities.map((l, i) => (
-            <option value={i} selected={i === defaultIdx}>{l.name}</option>
+        <select id="locality" aria-label="Choose your city or area">
+          {groups.map((g) => (
+            <optgroup label={g.title}>
+              {g.items.map((i) => (
+                <option value={i} selected={i === defaultIdx}>{localities[i].name}</option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </span>
@@ -207,6 +213,7 @@ const defaultIdx = defaultLocality
   <script>
     import { verdict } from "../lib/nowcast.js";
     import { nearestZone, floodRisk } from "../lib/flood.js";
+    import { groupLocalities } from "../lib/localities.js";
 
     // --- DOM handles ---
     const app = document.getElementById("app");
@@ -236,7 +243,7 @@ const defaultIdx = defaultLocality
     let pick = null;          // sheet refs: { overlay, sheet, input, status, empty, locateBtn, locateLabel, locateErr }
     let trigger = null;       // the pill button that opens the picker
     let triggerName = null;   // the pill's visible area label
-    let rowEls = [];          // all 36 area rows (each carries data-idx)
+    let rowEls = [];          // picker rows (each carries data-idx)
     let groupHeadEls = [];    // region headers (hidden while searching)
     let pickerOpen = false;
     let lastFocus = null;     // element to restore focus to on close
@@ -407,7 +414,7 @@ const defaultIdx = defaultLocality
       const ver = MODEL.version != null
         ? `v${MODEL.version}`
         : (MODEL.trained_at ? MODEL.trained_at.slice(0, 10) : "live");
-      elHonesty.textContent = `calibrated forecast for your spot · model ${ver}`;
+      elHonesty.textContent = `forecast for your spot · model ${ver}`;
     }
 
     // --- The rising-water gauge ---
@@ -668,29 +675,10 @@ const defaultIdx = defaultLocality
     }
 
     // --- Feature 1: the locality picker — a custom, dependency-free overlay ---
-    // A different pattern from a dropdown: tapping the pill opens a centered modal
-    // (desktop) or a bottom sheet (mobile) with a search box, a "use my location"
-    // button, and the 36 areas grouped by Mumbai region. It enhances the native
-    // <select>; if anything here throws, the bare <select> + its change handler
-    // remain as the working fallback. Regions are ordered south → far-north, the
-    // way each local-train line actually runs.
-    // Region ORDER (south → far north/east), the way the local-train lines run.
-    const REGION_ORDER = [
-      "South Mumbai", "Western Suburbs", "Central & Eastern Suburbs",
-      "Harbour & Navi Mumbai", "Thane & Far Suburbs",
-    ];
-    // Classify an area into a region by coordinate bands — data-driven, so the
-    // locality list can grow (now ~146 areas from OpenStreetMap) without a hand-
-    // maintained name list. Mumbai doesn't fall into clean rectangles, so these
-    // thresholds are tuned against the major stations (Thane, Panvel, Dahisar);
-    // the trailing "More areas" group still catches anything that slips through.
-    function regionOf({ lat, lon }) {
-      if (lat <= 19.02 && lon <= 72.86) return "South Mumbai";
-      if (lon >= 72.985 && lat <= 19.17) return "Harbour & Navi Mumbai";
-      if (lat >= 19.27 || lon >= 73.00 || (lat >= 19.19 && lon >= 72.96)) return "Thane & Far Suburbs";
-      if (lon < 72.875) return "Western Suburbs";
-      return "Central & Eastern Suburbs";
-    }
+    // Tap the pill → modal (desktop) or bottom sheet (mobile): search, GPS, map,
+    // and the catalog grouped by state (Mumbai neighbourhoods pinned first).
+    // Enhances the native <select>; if this throws, the bare <select> still works.
+
 
     function initPicker() {
       // Native fallback: if the custom picker can't build, the still-visible
@@ -704,23 +692,6 @@ const defaultIdx = defaultLocality
       }
     }
 
-    // Bucket LOCALITIES into the ordered regions via regionOf, each sorted
-    // south→north (by latitude). Anything an unforeseen case misses lands in a
-    // trailing "More areas" group so a data change can never silently drop one.
-    function groupLocalities() {
-      const buckets = new Map(REGION_ORDER.map((t) => [t, []]));
-      const rest = [];
-      LOCALITIES.forEach((l, i) => {
-        const r = regionOf(l);
-        if (buckets.has(r)) buckets.get(r).push(i); else rest.push(i);
-      });
-      const byLat = (a, b) => LOCALITIES[a].lat - LOCALITIES[b].lat;
-      const groups = REGION_ORDER
-        .map((t) => ({ title: t, items: buckets.get(t).sort(byLat) }))
-        .filter((g) => g.items.length);
-      if (rest.length) groups.push({ title: "More areas", items: rest.sort(byLat) });
-      return groups;
-    }
 
     function el(tag, cls, attrs) {
       const n = document.createElement(tag);
@@ -741,7 +712,7 @@ const defaultIdx = defaultLocality
         '<span class="loc-name"></span>' +
         '<span class="loc-caret" aria-hidden="true">▾</span>';
       triggerName = trigger.querySelector(".loc-name");
-      triggerName.textContent = (app.dataset.defaultLocality || "").trim() || "Mumbai";
+      triggerName.textContent = (app.dataset.defaultLocality || "").trim() || "India";
       trigger.addEventListener("click", openPicker);
 
       const overlay = el("div", "locpick-overlay", { id: "locpick" });
@@ -754,7 +725,7 @@ const defaultIdx = defaultLocality
 
       const head = el("div", "locpick-head");
       const heading = el("div", "locpick-heading");
-      const eyebrow = el("p", "locpick-eyebrow"); eyebrow.textContent = "Your area";
+      const eyebrow = el("p", "locpick-eyebrow"); eyebrow.textContent = "India";
       const title = el("h2", "locpick-title", { id: "locpick-title" });
       title.textContent = "Where are you?";
       heading.appendChild(eyebrow); heading.appendChild(title);
@@ -769,10 +740,10 @@ const defaultIdx = defaultLocality
       const glyph = el("span", "locpick-search-glyph", { "aria-hidden": "true" });
       glyph.textContent = "⌕";
       const label = el("label", "locpick-vh", { for: "locpick-input" });
-      label.textContent = "Search your area";
+      label.textContent = "Search city, area, or state";
       const input = el("input", "locpick-input", {
         id: "locpick-input", type: "text", autocomplete: "off",
-        autocapitalize: "off", spellcheck: "false", placeholder: "Search your area…",
+        autocapitalize: "off", spellcheck: "false", placeholder: "Search city, area, or state…",
       });
       searchWrap.appendChild(glyph);
       searchWrap.appendChild(label);
@@ -803,8 +774,9 @@ const defaultIdx = defaultLocality
 
       rowEls = [];
       groupHeadEls = [];
-      groupLocalities().forEach((g) => {
+      groupLocalities(LOCALITIES).forEach((g) => {
         const gh = el("div", "locpick-group-head");
+        gh.dataset.title = g.title.toLowerCase();
         const gt = el("span", "locpick-group-title"); gt.textContent = g.title;
         const gn = el("span", "locpick-group-n", { "aria-hidden": "true" });
         gn.textContent = String(g.items.length);
@@ -818,9 +790,10 @@ const defaultIdx = defaultLocality
             "aria-label": `${loc.name}, ${g.title}`,
           });
           row.dataset.name = loc.name.toLowerCase();
+          row.dataset.group = g.title.toLowerCase();
           const nm = el("span", "locpick-row-name"); nm.textContent = loc.name;
           const co = el("span", "locpick-row-coord", { "aria-hidden": "true" });
-          co.textContent = `${loc.lat.toFixed(2)}°N`;
+          co.textContent = loc.metro ? `${loc.lat.toFixed(2)}°N` : (loc.state || "");
           row.appendChild(nm); row.appendChild(co);
           row.addEventListener("click", () => selectArea(i));
           list.appendChild(row);
@@ -830,12 +803,9 @@ const defaultIdx = defaultLocality
       const empty = el("p", "locpick-empty", { hidden: "" });
       list.appendChild(empty);
 
-      // --- "Search any place" geocode fallback (places OUTSIDE the curated 146) ---
-      // The curated Mumbai list stays the PRIMARY result. The Open-Meteo geocoder
-      // lacks Mumbai East/West (ward-level) granularity — the curated 146 cover
-      // that — so this only surfaces when NOTHING curated matches a real query, for
-      // other cities/towns (Pune, Lonavala, …). Button + status + results sit at
-      // the foot of the list, just under the "no area matches" message.
+      // --- "Search any place" geocode fallback (towns not in the catalog) ---
+      // Curated rows stay primary. Geocoder is India-scoped; this only surfaces
+      // when NOTHING curated matches, for villages and pin-level names.
       const geoBtn = el("button", "locpick-geo-btn", { type: "button", hidden: "" });
       geoBtn.innerHTML =
         '<span class="locpick-geo-ico" aria-hidden="true">⌕</span>' +
@@ -856,7 +826,7 @@ const defaultIdx = defaultLocality
       mapWrap.appendChild(mapEl); mapWrap.appendChild(mapPin);
       const mapBar = el("div", "locpick-mapbar");
       const mapBack = el("button", "locpick-mapback", { type: "button" });
-      mapBack.innerHTML = "&#8249;&nbsp;Areas";
+      mapBack.innerHTML = "&#8249;&nbsp;Places";
       const mapNear = el("p", "locpick-mapnear");
       mapNear.innerHTML = 'Nearest&nbsp;·&nbsp;<span class="locpick-mapnear-name">…</span>';
       const mapUse = el("button", "locpick-mapuse", { type: "button" });
@@ -901,24 +871,22 @@ const defaultIdx = defaultLocality
       const q = raw.toLowerCase();
       let n = 0;
       rowEls.forEach((b) => {
-        const match = !q || b.dataset.name.includes(q);
+        const match = !q || b.dataset.name.includes(q) || (b.dataset.group || "").includes(q);
         b.hidden = !match;
         if (match) n++;
       });
-      // A search flattens the regions into one filtered list.
-      groupHeadEls.forEach((h) => { h.hidden = q.length > 0; });
+      groupHeadEls.forEach((h) => {
+        if (!q) { h.hidden = false; return; }
+        h.hidden = !(h.dataset.title || "").includes(q);
+      });
       pick.empty.hidden = n > 0;
-      if (!n) pick.empty.textContent = `No area matches “${raw}”.`;
-      pick.status.textContent = n ? `${n} area${n === 1 ? "" : "s"}` : "No matches";
+      if (!n) pick.empty.textContent = `No place matches “${raw}”.`;
+      pick.status.textContent = n ? `${n} place${n === 1 ? "" : "s"}` : "No matches";
 
-      // Geocode fallback. The curated 146 are the PRIMARY result; only when NOTHING
-      // curated matches a real query (≥2 chars) do we offer "search anywhere" — for
-      // places OUTSIDE Mumbai. Always reset first so any matches (or a fresh keystroke)
-      // clear a prior search; the Open-Meteo geocoder has no Mumbai East/West depth.
       resetGeocode();
       if (!n && raw.length >= 2) {
         geoQuery = raw;
-        pick.geoBtnLabel.textContent = `Search “${raw}” anywhere`;
+        pick.geoBtnLabel.textContent = `Search “${raw}” in India`;
         pick.geoBtn.hidden = false;
       }
     }
@@ -949,7 +917,7 @@ const defaultIdx = defaultLocality
       try {
         const url =
           `https://geocoding-api.open-meteo.com/v1/search` +
-          `?name=${encodeURIComponent(q)}&count=6&language=en&format=json`;
+          `?name=${encodeURIComponent(q)}&count=6&language=en&format=json&country=IN`;
         const r = await fetch(url);
         if (!r.ok) throw new Error(`geocoder ${r.status}`);
         const data = await r.json();
@@ -984,9 +952,8 @@ const defaultIdx = defaultLocality
       }
     }
 
-    // Pick a geocoded place (OUTSIDE the curated 146). It has no curated index, so we
-    // do NOT call selectIndex with a fake one — set the pill label + aria-label, clear
-    // the curated active-row markers, then render the verdict at the EXACT geocoded coords.
+    // Pick a geocoded place not in the catalog. No curated index — set the pill
+    // label, clear active-row markers, render the verdict at the geocoded coords.
     function selectGeocoded(res) {
       if (triggerName) triggerName.textContent = res.name;
       if (trigger) trigger.setAttribute("aria-label", `Change your area — currently ${res.name}`);
