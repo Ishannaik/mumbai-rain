@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-09-11T18:24:38Z",
+  "generated_at": "2026-09-11T21:41:22Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
-    "n_rows": 14856,
-    "n_labelled": 7083,
-    "n_pending": 7773,
+    "n_rows": 14880,
+    "n_labelled": 7084,
+    "n_pending": 7796,
     "n_rain": 1584,
     "base_rate": 0.2236,
-    "n_runs": 619,
+    "n_runs": 620,
     "first_issued": "2026-06-25T15:00",
-    "last_issued": "2026-09-11T18:00",
-    "hours_since_last_issue": 0.41,
+    "last_issued": "2026-09-11T21:00",
+    "hours_since_last_issue": 0.69,
     "stale_level": "ok",
-    "gap_count_gt_1h": 352,
+    "gap_count_gt_1h": 353,
     "max_gap_h": 511.0,
-    "unique_valid": 1264
+    "unique_valid": 1265
   },
   "model": {
     "type": "logistic",
@@ -38,34 +38,34 @@
     ]
   },
   "eval": {
-    "n_labelled": 7083,
+    "n_labelled": 7084,
     "min_rows": 200,
     "ready": true,
     "holdout": {
-      "n_train": 5666,
+      "n_train": 5667,
       "n_test": 1417,
-      "base_rate_train": 0.2563,
+      "base_rate_train": 0.2562,
       "rain_mm_threshold": 0.3,
       "brier": {
         "model": 0.0921,
-        "raw": 0.367,
+        "raw": 0.3663,
         "clim": 0.1111,
         "stored_model": 0.0941
       },
       "bss": {
-        "model_vs_raw": 0.7491,
-        "model_vs_clim": 0.1712
+        "model_vs_raw": 0.7486,
+        "model_vs_clim": 0.171
       },
       "raw_contingency": {
         "tp": 41,
-        "fp": 429,
+        "fp": 428,
         "fn": 91,
-        "tn": 856,
+        "tn": 857,
         "pod": 0.3106,
-        "far": 0.9128,
-        "csi": 0.0731,
-        "bias": 3.5606,
-        "accuracy": 0.633
+        "far": 0.9126,
+        "csi": 0.0732,
+        "bias": 3.553,
+        "accuracy": 0.6337
       },
       "model_contingency_p05": {
         "tp": 4,
@@ -88,7 +88,7 @@
     "tp": 1194,
     "fp": 2389,
     "fn": 390,
-    "tn": 3110,
+    "tn": 3111,
     "pod": 0.7538,
     "far": 0.6668,
     "csi": 0.3005,
