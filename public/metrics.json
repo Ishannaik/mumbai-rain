@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-09-20T12:15:27Z",
+  "generated_at": "2026-09-20T16:45:32Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
-    "n_rows": 16008,
-    "n_labelled": 7660,
-    "n_pending": 8348,
+    "n_rows": 16032,
+    "n_labelled": 7681,
+    "n_pending": 8351,
     "n_rain": 1719,
-    "base_rate": 0.2244,
-    "n_runs": 667,
+    "base_rate": 0.2238,
+    "n_runs": 668,
     "first_issued": "2026-06-25T15:00",
-    "last_issued": "2026-09-20T12:00",
-    "hours_since_last_issue": 0.26,
+    "last_issued": "2026-09-20T16:00",
+    "hours_since_last_issue": 0.76,
     "stale_level": "ok",
-    "gap_count_gt_1h": 400,
+    "gap_count_gt_1h": 401,
     "max_gap_h": 511.0,
-    "unique_valid": 1453
+    "unique_valid": 1458
   },
   "model": {
     "type": "raw",
@@ -38,18 +38,18 @@
     ]
   },
   "eval": {
-    "n_labelled": 7660,
+    "n_labelled": 7681,
     "min_rows": 200,
     "ready": true,
     "holdout": {
-      "n_train": 6128,
-      "n_test": 1532,
+      "n_train": 6144,
+      "n_test": 1537,
       "base_rate_train": 0.241,
       "rain_mm_threshold": 0.3,
       "brier": {
         "model": null,
-        "raw": 0.3766,
-        "clim": 0.1399,
+        "raw": 0.3689,
+        "clim": 0.1383,
         "stored_model": 0.38
       },
       "bss": {
@@ -58,14 +58,14 @@
       },
       "raw_contingency": {
         "tp": 110,
-        "fp": 445,
-        "fn": 132,
-        "tn": 845,
-        "pod": 0.4545,
-        "far": 0.8018,
-        "csi": 0.1601,
-        "bias": 2.2934,
-        "accuracy": 0.6234
+        "fp": 439,
+        "fn": 128,
+        "tn": 860,
+        "pod": 0.4622,
+        "far": 0.7996,
+        "csi": 0.1625,
+        "bias": 2.3067,
+        "accuracy": 0.6311
       },
       "model_contingency_p05": null,
       "model_type": "raw",
@@ -78,12 +78,12 @@
     "tp": 1269,
     "fp": 2578,
     "fn": 450,
-    "tn": 3363,
+    "tn": 3384,
     "pod": 0.7382,
     "far": 0.6701,
     "csi": 0.2953,
     "bias": 2.2379,
-    "accuracy": 0.6047
+    "accuracy": 0.6058
   },
   "thresholds": {
     "rain_mm": 0.3,
