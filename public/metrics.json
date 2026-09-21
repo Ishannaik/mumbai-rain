@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T06:14:35Z",
+  "generated_at": "2026-09-21T06:35:24Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
@@ -14,20 +14,20 @@
     "n_runs": 672,
     "first_issued": "2026-06-25T15:00",
     "last_issued": "2026-09-21T06:00",
-    "hours_since_last_issue": 0.24,
+    "hours_since_last_issue": 0.59,
     "stale_level": "ok",
     "gap_count_gt_1h": 405,
     "max_gap_h": 511.0,
     "unique_valid": 1470
   },
   "model": {
-    "type": "raw",
-    "trained_at": "2026-09-20T06:28:54Z",
-    "stored_brier": 0.38,
-    "stored_raw_brier": 0.38,
-    "stored_clim_brier": 0.142,
-    "n_train": 6113,
-    "n_test": 1529,
+    "type": "logistic",
+    "trained_at": "2026-09-21T06:35:23Z",
+    "stored_brier": 0.1352,
+    "stored_raw_brier": 0.3632,
+    "stored_clim_brier": 0.1366,
+    "n_train": 6168,
+    "n_test": 1542,
     "features": [
       "fc_bestmatch_mm",
       "fc_ecmwf_mm",
@@ -47,14 +47,14 @@
       "base_rate_train": 0.2408,
       "rain_mm_threshold": 0.3,
       "brier": {
-        "model": null,
+        "model": 0.1352,
         "raw": 0.3632,
         "clim": 0.1366,
-        "stored_model": 0.38
+        "stored_model": 0.1352
       },
       "bss": {
-        "model_vs_raw": null,
-        "model_vs_clim": null
+        "model_vs_raw": 0.6276,
+        "model_vs_clim": 0.0103
       },
       "raw_contingency": {
         "tp": 107,
@@ -67,11 +67,21 @@
         "bias": 2.3077,
         "accuracy": 0.6368
       },
-      "model_contingency_p05": null,
-      "model_type": "raw",
-      "beats_raw": false,
-      "beats_clim": false,
-      "status": "no_logistic"
+      "model_contingency_p05": {
+        "tp": 25,
+        "fp": 38,
+        "fn": 209,
+        "tn": 1270,
+        "pod": 0.1068,
+        "far": 0.6032,
+        "csi": 0.0919,
+        "bias": 0.2692,
+        "accuracy": 0.8398
+      },
+      "model_type": "logistic",
+      "beats_raw": true,
+      "beats_clim": true,
+      "status": "ok"
     }
   },
   "all_labelled_raw": {
@@ -94,9 +104,9 @@
   },
   "go_live": {
     "enough_data": true,
-    "model_logistic": false,
-    "beats_raw_holdout": false,
-    "beats_clim_holdout": false,
+    "model_logistic": true,
+    "beats_raw_holdout": true,
+    "beats_clim_holdout": true,
     "collect_fresh": true
   }
 }
