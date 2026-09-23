@@ -16,6 +16,7 @@ License: MIT
 - Live metrics JSON: https://rain.ishannaik.com/metrics.json
 - API: GET https://rain.ishannaik.com/api/nowcast?lat=19.06&lon=72.83&hours=2
   also ?locality=chennai or ?locality=bandra
+  also ?locality=bandra&hours=3
 
 ## Honest claims
 
