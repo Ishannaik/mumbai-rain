@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-09-25T13:39:50Z",
+  "generated_at": "2026-09-25T18:30:38Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
-    "n_rows": 16656,
-    "n_labelled": 8016,
-    "n_pending": 8640,
+    "n_rows": 16680,
+    "n_labelled": 8036,
+    "n_pending": 8644,
     "n_rain": 1746,
-    "base_rate": 0.2178,
-    "n_runs": 694,
+    "base_rate": 0.2173,
+    "n_runs": 695,
     "first_issued": "2026-06-25T15:00",
-    "last_issued": "2026-09-25T13:00",
-    "hours_since_last_issue": 0.66,
+    "last_issued": "2026-09-25T18:00",
+    "hours_since_last_issue": 0.51,
     "stale_level": "ok",
-    "gap_count_gt_1h": 427,
+    "gap_count_gt_1h": 428,
     "max_gap_h": 511.0,
-    "unique_valid": 1566
+    "unique_valid": 1570
   },
   "model": {
     "type": "raw",
@@ -38,18 +38,18 @@
     ]
   },
   "eval": {
-    "n_labelled": 8016,
+    "n_labelled": 8036,
     "min_rows": 200,
     "ready": true,
     "holdout": {
-      "n_train": 6412,
-      "n_test": 1604,
-      "base_rate_train": 0.2346,
+      "n_train": 6428,
+      "n_test": 1608,
+      "base_rate_train": 0.2352,
       "rain_mm_threshold": 0.3,
       "brier": {
         "model": null,
-        "raw": 0.3229,
-        "clim": 0.1351,
+        "raw": 0.3165,
+        "clim": 0.1324,
         "stored_model": 0.3702
       },
       "bss": {
@@ -57,15 +57,15 @@
         "model_vs_clim": null
       },
       "raw_contingency": {
-        "tp": 104,
-        "fp": 380,
-        "fn": 138,
-        "tn": 982,
-        "pod": 0.4298,
-        "far": 0.7851,
-        "csi": 0.1672,
-        "bias": 2.0,
-        "accuracy": 0.6771
+        "tp": 100,
+        "fp": 375,
+        "fn": 134,
+        "tn": 999,
+        "pod": 0.4274,
+        "far": 0.7895,
+        "csi": 0.1642,
+        "bias": 2.0299,
+        "accuracy": 0.6835
       },
       "model_contingency_p05": null,
       "model_type": "raw",
@@ -78,12 +78,12 @@
     "tp": 1272,
     "fp": 2612,
     "fn": 474,
-    "tn": 3658,
+    "tn": 3678,
     "pod": 0.7285,
     "far": 0.6725,
     "csi": 0.2919,
     "bias": 2.2245,
-    "accuracy": 0.615
+    "accuracy": 0.616
   },
   "thresholds": {
     "rain_mm": 0.3,
