@@ -1,5 +1,5 @@
 {
-  "type": "raw",
+  "type": "logistic",
   "features": [
     "fc_bestmatch_mm",
     "fc_ecmwf_mm",
@@ -9,19 +9,28 @@
     "recent_rain_mm"
   ],
   "weights": [
-    1.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0
+    0.334883,
+    0.61811,
+    0.185674,
+    -0.229988,
+    -0.933766,
+    0.039481
   ],
-  "intercept": 0.0,
-  "trained_at": "2026-09-22T06:24:10Z",
-  "n_train": 6224,
-  "n_test": 1556,
-  "brier": 0.3702,
-  "raw_brier": 0.3702,
-  "clim_brier": 0.1423,
-  "champion_brier": 0.1438
+  "intercept": -17.812191,
+  "trained_at": "2026-09-28T07:05:56Z",
+  "n_train": 6530,
+  "n_test": 1633,
+  "brier": 0.1292,
+  "raw_brier": 0.2921,
+  "clim_brier": 0.1293,
+  "champion_brier": null,
+  "cv_folds": 4,
+  "cv_purge_hours": 6,
+  "cv_bss_vs_raw": [
+    0.6392,
+    0.8116,
+    0.6683,
+    0.5667
+  ],
+  "cv_bss_median": 0.6538
 }
