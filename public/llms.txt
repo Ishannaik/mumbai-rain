@@ -31,6 +31,7 @@ License: MIT
 - /scoreboard — model vs raw honesty board
 - /about — method and non-claims
 - /{locality} — per-place pages (e.g. /bandra, /chennai)
+- /ai: facts about the site for AI assistants
 
 ## Data
 
