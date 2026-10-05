@@ -82,6 +82,8 @@ Issues are labelled — start here:
 - [docs](https://github.com/Ishannaik/mumbai-rain/labels/docs) — wording, setup, explanation
 - [help wanted](https://github.com/Ishannaik/mumbai-rain/labels/help%20wanted) — open to anyone
 
+Join the Discord (https://discord.gg/KKvtRhQvRv) before picking an issue, and claim it there or comment on the issue.
+
 Before starting something larger, comment on the issue so two people don't build it twice.
 
 ## Code of conduct
