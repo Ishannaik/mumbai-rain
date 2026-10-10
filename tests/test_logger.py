@@ -52,3 +52,13 @@ def test_backfill_skips_already_labelled():
     rows = [{"valid_at": "2026-06-25T20:00", "observed_raining": 0}]
     backfill_observed(rows, {"2026-06-25T20:00": True})
     assert rows[0]["observed_raining"] == 0   # not overwritten
+
+
+def test_lead_hours_handles_utc_issued_and_ist_valid():
+    from pipeline.labels import lead_hours
+
+    row = {
+        "issued_at": "2026-06-25T15:00",  # 20:30 IST
+        "valid_at": "2026-06-25T21:00",   # 21:00 IST
+    }
+    assert lead_hours(row) == 0.5
