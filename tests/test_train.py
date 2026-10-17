@@ -216,3 +216,21 @@ def test_promotion_needs_median_above_zero_and_two_wins():
     assert not passes_walk_forward([0.01, 0.02, -1.0, -1.0])
     assert not passes_walk_forward([0.5])                # a single fold is not validation
     assert not passes_walk_forward([])
+
+
+def test_training_rows_keeps_only_lead_times_from_zero_to_six_hours():
+    from pipeline.labels import lead_hours
+
+    rows = [
+        {"observed_raining": "1", "issued_at": "2026-06-25T15:00", "valid_at": "2026-06-25T20:30"},  # 0 h
+        {"observed_raining": "1", "issued_at": "2026-06-25T15:00", "valid_at": "2026-06-25T21:00"},  # 0.5 h
+        {"observed_raining": "0", "issued_at": "2026-06-25T15:00", "valid_at": "2026-06-26T02:30"},  # 6 h
+        {"observed_raining": "0", "issued_at": "2026-06-25T15:00", "valid_at": "2026-06-26T03:00"},  # 6.5 h
+    ]
+
+    from pipeline.train import training_rows
+    out = training_rows(rows)
+    leads = [lead_hours(row) for row in out]
+
+    assert all(0 <= lead <= 6 for lead in leads)
+    assert len(out) == 3

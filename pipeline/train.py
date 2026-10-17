@@ -169,6 +169,24 @@ def matured(rows):
     return out
 
 
+def training_rows(rows):
+    """Keep labelled rows with forecast lead times between 0 and 6 hours."""
+    from pipeline.labels import lead_hours
+
+    return [
+        row for row in matured(rows)
+        if _valid_training_lead(row, lead_hours)
+    ]
+
+
+def _valid_training_lead(row, lead_hours):
+    try:
+        lead = lead_hours(row)
+    except (KeyError, ValueError, TypeError):
+        return False
+    return 0 <= lead <= 6
+
+
 def build_xy(rows):
     return [row_to_features(r) for r in rows], [int(float(r["observed_raining"])) for r in rows]
 
@@ -254,7 +272,7 @@ def _load_champion():
 
 def main():
     with open(LOG_PATH, newline="") as f:
-        rows = matured(list(csv.DictReader(f)))
+        rows = training_rows(list(csv.DictReader(f)))
 
     if len(rows) < MIN_ROWS:
         print(f"{len(rows)}/{MIN_ROWS} matured rows — not enough to train yet. Skipping (no-op).")
