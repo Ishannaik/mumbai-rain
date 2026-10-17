@@ -96,6 +96,11 @@ Setup, how to run the tests, and how `health` and `/scoreboard` fit together:
 [good first issue](https://github.com/Ishannaik/mumbai-rain/labels/good%20first%20issue)
 and [docs](https://github.com/Ishannaik/mumbai-rain/labels/docs) labels.
 
+## Community
+
+Join the [Discord server](https://discord.gg/KKvtRhQvRv) to chat with contributors and discuss Mumbai rain nowcasts.
+Say hi, share local feedback, or bounce ideas before opening a PR.
+
 ## License
 
 [MIT](./LICENSE) · Weather data by [Open-Meteo](https://open-meteo.com/)
