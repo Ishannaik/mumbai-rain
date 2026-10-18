@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-10-18T20:35:08Z",
+  "generated_at": "2026-10-18T23:02:42Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
-    "n_rows": 19224,
-    "n_labelled": 9311,
-    "n_pending": 9913,
+    "n_rows": 19248,
+    "n_labelled": 9313,
+    "n_pending": 9935,
     "n_rain": 1758,
     "base_rate": 0.1888,
-    "n_runs": 801,
+    "n_runs": 802,
     "first_issued": "2026-06-25T15:00",
-    "last_issued": "2026-10-18T20:00",
-    "hours_since_last_issue": 0.59,
+    "last_issued": "2026-10-18T23:00",
+    "hours_since_last_issue": 0.05,
     "stale_level": "ok",
-    "gap_count_gt_1h": 534,
+    "gap_count_gt_1h": 535,
     "max_gap_h": 511.0,
-    "unique_valid": 2053
+    "unique_valid": 2055
   },
   "model": {
     "type": "logistic",
@@ -38,34 +38,34 @@
     ]
   },
   "eval": {
-    "n_labelled": 9311,
+    "n_labelled": 9313,
     "min_rows": 200,
     "ready": true,
     "holdout": {
-      "n_train": 7448,
+      "n_train": 7450,
       "n_test": 1863,
-      "base_rate_train": 0.2276,
+      "base_rate_train": 0.2275,
       "rain_mm_threshold": 0.3,
       "brier": {
         "model": 0.0383,
-        "raw": 0.1009,
+        "raw": 0.0998,
         "clim": 0.0702,
         "stored_model": 0.0411
       },
       "bss": {
-        "model_vs_raw": 0.6205,
-        "model_vs_clim": 0.4546
+        "model_vs_raw": 0.6164,
+        "model_vs_clim": 0.4544
       },
       "raw_contingency": {
         "tp": 9,
-        "fp": 134,
+        "fp": 132,
         "fn": 54,
-        "tn": 1666,
+        "tn": 1668,
         "pod": 0.1429,
-        "far": 0.9371,
-        "csi": 0.0457,
-        "bias": 2.2698,
-        "accuracy": 0.8991
+        "far": 0.9362,
+        "csi": 0.0462,
+        "bias": 2.2381,
+        "accuracy": 0.9002
       },
       "model_contingency_p05": {
         "tp": 3,
@@ -88,7 +88,7 @@
     "tp": 1272,
     "fp": 2667,
     "fn": 486,
-    "tn": 4886,
+    "tn": 4888,
     "pod": 0.7235,
     "far": 0.6771,
     "csi": 0.2875,
