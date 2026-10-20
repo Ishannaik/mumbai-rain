@@ -9,28 +9,28 @@
     "recent_rain_mm"
   ],
   "weights": [
-    0.234506,
-    0.731112,
-    0.153894,
-    -0.29847,
-    -0.883996,
-    0.0597
+    0.23719,
+    0.729495,
+    0.152204,
+    -0.300713,
+    -0.876034,
+    0.059855
   ],
-  "intercept": -15.159825,
-  "trained_at": "2026-10-19T06:21:29Z",
-  "n_train": 7453,
-  "n_test": 1864,
-  "brier": 0.038,
-  "raw_brier": 0.0998,
-  "clim_brier": 0.0701,
-  "champion_brier": 0.0383,
+  "intercept": -15.016874,
+  "trained_at": "2026-10-20T06:10:23Z",
+  "n_train": 7518,
+  "n_test": 1880,
+  "brier": 0.0333,
+  "raw_brier": 0.0899,
+  "clim_brier": 0.0671,
+  "champion_brier": 0.0334,
   "cv_folds": 4,
   "cv_purge_hours": 6,
   "cv_bss_vs_raw": [
-    0.7467,
-    0.7682,
-    0.5541,
-    0.757
+    0.7358,
+    0.789,
+    0.5621,
+    0.8354
   ],
-  "cv_bss_median": 0.7519
+  "cv_bss_median": 0.7624
 }
