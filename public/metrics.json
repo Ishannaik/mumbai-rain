@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-23T04:37:58Z",
+  "generated_at": "2026-10-23T06:07:05Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
@@ -14,7 +14,7 @@
     "n_runs": 823,
     "first_issued": "2026-06-25T15:00",
     "last_issued": "2026-10-23T04:00",
-    "hours_since_last_issue": 0.63,
+    "hours_since_last_issue": 2.12,
     "stale_level": "ok",
     "gap_count_gt_1h": 556,
     "max_gap_h": 511.0,
@@ -22,12 +22,12 @@
   },
   "model": {
     "type": "logistic",
-    "trained_at": "2026-10-22T06:12:01Z",
-    "stored_brier": 0.0246,
-    "stored_raw_brier": 0.0724,
-    "stored_clim_brier": 0.0621,
-    "n_train": 7620,
-    "n_test": 1905,
+    "trained_at": "2026-10-23T06:07:04Z",
+    "stored_brier": 0.0237,
+    "stored_raw_brier": 0.0688,
+    "stored_clim_brier": 0.0614,
+    "n_train": 7673,
+    "n_test": 1919,
     "features": [
       "fc_bestmatch_mm",
       "fc_ecmwf_mm",
@@ -47,14 +47,14 @@
       "base_rate_train": 0.224,
       "rain_mm_threshold": 0.3,
       "brier": {
-        "model": 0.0239,
+        "model": 0.0237,
         "raw": 0.0688,
         "clim": 0.0614,
-        "stored_model": 0.0246
+        "stored_model": 0.0237
       },
       "bss": {
-        "model_vs_raw": 0.6532,
-        "model_vs_clim": 0.6116
+        "model_vs_raw": 0.655,
+        "model_vs_clim": 0.6136
       },
       "raw_contingency": {
         "tp": 3,
