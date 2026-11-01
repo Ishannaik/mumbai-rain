@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-10-31T21:26:21Z",
+  "generated_at": "2026-11-01T01:01:30Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
-    "n_rows": 20736,
-    "n_labelled": 10148,
-    "n_pending": 10588,
+    "n_rows": 20760,
+    "n_labelled": 10152,
+    "n_pending": 10608,
     "n_rain": 1762,
     "base_rate": 0.1736,
-    "n_runs": 864,
+    "n_runs": 865,
     "first_issued": "2026-06-25T15:00",
-    "last_issued": "2026-10-31T21:00",
-    "hours_since_last_issue": 0.44,
+    "last_issued": "2026-11-01T01:00",
+    "hours_since_last_issue": 0.02,
     "stale_level": "ok",
-    "gap_count_gt_1h": 597,
+    "gap_count_gt_1h": 598,
     "max_gap_h": 511.0,
-    "unique_valid": 2340
+    "unique_valid": 2344
   },
   "model": {
     "type": "logistic",
@@ -38,13 +38,13 @@
     ]
   },
   "eval": {
-    "n_labelled": 10148,
+    "n_labelled": 10152,
     "min_rows": 200,
     "ready": true,
     "holdout": {
-      "n_train": 8118,
-      "n_test": 2030,
-      "base_rate_train": 0.2151,
+      "n_train": 8121,
+      "n_test": 2031,
+      "base_rate_train": 0.215,
       "rain_mm_threshold": 0.3,
       "brier": {
         "model": 0.0085,
@@ -54,13 +54,13 @@
       },
       "bss": {
         "model_vs_raw": 0.8066,
-        "model_vs_clim": 0.833
+        "model_vs_clim": 0.8329
       },
       "raw_contingency": {
         "tp": 0,
         "fp": 73,
         "fn": 16,
-        "tn": 1941,
+        "tn": 1942,
         "pod": 0.0,
         "far": 1.0,
         "csi": 0.0,
@@ -71,7 +71,7 @@
         "tp": 0,
         "fp": 1,
         "fn": 16,
-        "tn": 2013,
+        "tn": 2014,
         "pod": 0.0,
         "far": 1.0,
         "csi": 0.0,
@@ -88,12 +88,12 @@
     "tp": 1272,
     "fp": 2688,
     "fn": 490,
-    "tn": 5698,
+    "tn": 5702,
     "pod": 0.7219,
     "far": 0.6788,
     "csi": 0.2858,
     "bias": 2.2474,
-    "accuracy": 0.6868
+    "accuracy": 0.687
   },
   "thresholds": {
     "rain_mm": 0.3,
