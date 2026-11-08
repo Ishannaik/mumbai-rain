@@ -49,3 +49,16 @@ def parse_metar(data: list) -> dict:
 def fetch_metar(station: str = "VABB", hours: int = 3) -> dict:
     data = requests.get(METAR_URL.format(ids=station, hours=hours), timeout=20).json()
     return parse_metar(data)
+
+
+def lead_hours(row) -> float:
+    """Calculate forecast lead time in hours from UTC issue time to IST valid time."""
+    issued_utc = datetime.strptime(
+        row["issued_at"], "%Y-%m-%dT%H:%M"
+    ).replace(tzinfo=timezone.utc)
+
+    valid_ist = datetime.strptime(
+        row["valid_at"], "%Y-%m-%dT%H:%M"
+    ).replace(tzinfo=IST)
+
+    return (valid_ist - issued_utc).total_seconds() / 3600
