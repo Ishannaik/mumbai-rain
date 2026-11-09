@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-09T06:07:55Z",
+  "generated_at": "2026-11-09T08:10:32Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
@@ -14,7 +14,7 @@
     "n_runs": 895,
     "first_issued": "2026-06-25T15:00",
     "last_issued": "2026-11-09T06:00",
-    "hours_since_last_issue": 0.13,
+    "hours_since_last_issue": 2.18,
     "stale_level": "ok",
     "gap_count_gt_1h": 628,
     "max_gap_h": 511.0,
