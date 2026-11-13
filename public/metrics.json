@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-11-13T00:11:08Z",
+  "generated_at": "2026-11-13T07:49:59Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
-    "n_rows": 21768,
-    "n_labelled": 10682,
-    "n_pending": 11086,
+    "n_rows": 21792,
+    "n_labelled": 10691,
+    "n_pending": 11101,
     "n_rain": 1762,
-    "base_rate": 0.165,
-    "n_runs": 907,
+    "base_rate": 0.1648,
+    "n_runs": 908,
     "first_issued": "2026-06-25T15:00",
-    "last_issued": "2026-11-13T00:00",
-    "hours_since_last_issue": 0.19,
+    "last_issued": "2026-11-13T07:00",
+    "hours_since_last_issue": 0.83,
     "stale_level": "ok",
-    "gap_count_gt_1h": 640,
+    "gap_count_gt_1h": 641,
     "max_gap_h": 511.0,
-    "unique_valid": 2586
+    "unique_valid": 2594
   },
   "model": {
     "type": "logistic",
@@ -38,13 +38,13 @@
     ]
   },
   "eval": {
-    "n_labelled": 10682,
+    "n_labelled": 10691,
     "min_rows": 200,
     "ready": true,
     "holdout": {
-      "n_train": 8545,
-      "n_test": 2137,
-      "base_rate_train": 0.2057,
+      "n_train": 8552,
+      "n_test": 2139,
+      "base_rate_train": 0.2056,
       "rain_mm_threshold": 0.3,
       "brier": {
         "model": 0.0023,
@@ -54,13 +54,13 @@
       },
       "bss": {
         "model_vs_raw": 0.9095,
-        "model_vs_clim": 0.9464
+        "model_vs_clim": 0.9463
       },
       "raw_contingency": {
         "tp": 0,
         "fp": 51,
         "fn": 4,
-        "tn": 2082,
+        "tn": 2084,
         "pod": 0.0,
         "far": 1.0,
         "csi": 0.0,
@@ -71,7 +71,7 @@
         "tp": 0,
         "fp": 0,
         "fn": 4,
-        "tn": 2133,
+        "tn": 2135,
         "pod": 0.0,
         "far": null,
         "csi": 0.0,
@@ -88,12 +88,12 @@
     "tp": 1272,
     "fp": 2692,
     "fn": 490,
-    "tn": 6228,
+    "tn": 6237,
     "pod": 0.7219,
     "far": 0.6791,
     "csi": 0.2856,
     "bias": 2.2497,
-    "accuracy": 0.7021
+    "accuracy": 0.7024
   },
   "thresholds": {
     "rain_mm": 0.3,
