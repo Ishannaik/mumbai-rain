@@ -1,24 +1,24 @@
 {
-  "generated_at": "2026-11-13T08:12:28Z",
+  "generated_at": "2026-11-13T16:11:15Z",
   "site": "https://rain.ishannaik.com",
   "paths": {
     "log": "data/log.csv",
     "model": "public/model.json"
   },
   "collection": {
-    "n_rows": 21792,
-    "n_labelled": 10691,
-    "n_pending": 11101,
+    "n_rows": 21816,
+    "n_labelled": 10707,
+    "n_pending": 11109,
     "n_rain": 1762,
-    "base_rate": 0.1648,
-    "n_runs": 908,
+    "base_rate": 0.1646,
+    "n_runs": 909,
     "first_issued": "2026-06-25T15:00",
-    "last_issued": "2026-11-13T07:00",
-    "hours_since_last_issue": 1.21,
+    "last_issued": "2026-11-13T16:00",
+    "hours_since_last_issue": 0.19,
     "stale_level": "ok",
-    "gap_count_gt_1h": 641,
+    "gap_count_gt_1h": 642,
     "max_gap_h": 511.0,
-    "unique_valid": 2594
+    "unique_valid": 2602
   },
   "model": {
     "type": "logistic",
@@ -38,18 +38,18 @@
     ]
   },
   "eval": {
-    "n_labelled": 10691,
+    "n_labelled": 10707,
     "min_rows": 200,
     "ready": true,
     "holdout": {
-      "n_train": 8552,
-      "n_test": 2139,
-      "base_rate_train": 0.2056,
+      "n_train": 8565,
+      "n_test": 2142,
+      "base_rate_train": 0.2053,
       "rain_mm_threshold": 0.3,
       "brier": {
         "model": 0.0023,
         "raw": 0.0257,
-        "clim": 0.0434,
+        "clim": 0.0432,
         "stored_model": 0.0024
       },
       "bss": {
@@ -60,7 +60,7 @@
         "tp": 0,
         "fp": 51,
         "fn": 4,
-        "tn": 2084,
+        "tn": 2087,
         "pod": 0.0,
         "far": 1.0,
         "csi": 0.0,
@@ -71,7 +71,7 @@
         "tp": 0,
         "fp": 0,
         "fn": 4,
-        "tn": 2135,
+        "tn": 2138,
         "pod": 0.0,
         "far": null,
         "csi": 0.0,
@@ -88,12 +88,12 @@
     "tp": 1272,
     "fp": 2692,
     "fn": 490,
-    "tn": 6237,
+    "tn": 6253,
     "pod": 0.7219,
     "far": 0.6791,
     "csi": 0.2856,
     "bias": 2.2497,
-    "accuracy": 0.7024
+    "accuracy": 0.7028
   },
   "thresholds": {
     "rain_mm": 0.3,
